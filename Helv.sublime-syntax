@@ -1,0 +1,44 @@
+%YAML 1.2
+---
+name: Helv
+file_extensions:
+  - helv
+  - hv
+scope: source.helv
+version: 2
+
+contexts:
+
+  main:
+    - match: '#'
+      scope: punctuation.definition.comment.begin.helv
+      push: comment
+    - match: '[0-9]+'
+      scope: constant.numeric.value.helv
+    - match: 'x'
+      scope: keyword.other.helv
+    - match: 'i'
+      scope: keyword.control.conditional.if.helv
+    - match: 'l'
+      scope: keyword.control.loop.do-while.helv
+    - match: 'h'
+      scope: keyword.control.flow.return.helv
+    - match: 'm(\+|\-|\*|\/|\%)'
+      scope: keyword.operator.arithmetic.helv
+    - match: '\['
+      scope: punctuation.section.brackets.begin.helv
+      push: bracket
+    - match: '\]'
+      scope: invalid.illegal.helv
+
+  comment:
+    - meta_scope: comment.block.helv
+    - match: '#'
+      scope: punctuation.definition.comment.end.helv
+      pop: true
+
+  bracket:
+    - match: '\]'
+      scope: punctuation.section.brackets.end.helv
+      pop: true
+    - include: main
