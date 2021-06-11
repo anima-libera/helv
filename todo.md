@@ -1,8 +1,6 @@
 
 ## TODO
 
-- Use git, add a `.gitignore`, put this on GitHub
-
 - Make the arithmetic operations syntax look better
   - By doing the next task
 - Add parsing modes with the syntax `mode;` and `mode;;`

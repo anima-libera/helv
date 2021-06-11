@@ -49,7 +49,7 @@ enum instr_name_t
 	INSTR_LOCAL_HALT,
 	INSTR_PUSH_IMMUINT,
 	INSTR_SWAP_ANY,
-	INSTR_DUP_ANY,
+	INSTR_DUPLICATE_ANY,
 	INSTR_KILL_ANY,
 	INSTR_ADD_UINT,
 	INSTR_SUB_UINT,
@@ -94,16 +94,16 @@ instr_t* prog_alloc_instr(prog_t* prog)
 	return &prog->array[prog->len-1];
 }
 
-/* Growable string. */
-struct growstr_t
+/* Growable string */
+struct gs_t
 {
 	unsigned int len; /* Counts in the null terminator */
 	unsigned int cap;
 	char* str;
 };
-typedef struct growstr_t growstr_t;
+typedef struct gs_t gs_t;
 
-void growstr_init(growstr_t* gs)
+void gs_init(gs_t* gs)
 {
 	gs->str = malloc(1);
 	gs->str[0] = '\0';
@@ -111,13 +111,13 @@ void growstr_init(growstr_t* gs)
 	gs->cap = 1;
 }
 
-void growstr_cleanup(growstr_t* gs)
+void gs_cleanup(gs_t* gs)
 {
 	free(gs->str);
 }
 
 /* Appends the printf-formatted arguments to the given growable string. */
-void growstr_append_f(growstr_t* gs, const char* format, ...)
+void gs_append_f(gs_t* gs, const char* format, ...)
 {
 	va_list ap_1, ap_2;
 	va_start(ap_1, format);
@@ -180,9 +180,57 @@ typedef struct prog_table_t prog_table_t;
 unsigned int prog_table_alloc_prog_index(prog_table_t* table)
 {
 	table->len++;
-	ARRAY_RESIZE_IF_NEEDED(table->len, table->cap,
-		table->array, prog_t);
+	ARRAY_RESIZE_IF_NEEDED(table->len, table->cap, table->array, prog_t);
 	return table->len-1;
+}
+
+/* Parsing mode set */
+struct pms_t
+{
+	unsigned int is_pop_after_use: 1; /* The `;` syntax instead of `;;` */
+	unsigned int has_basic_short: 1;
+	unsigned int has_basic_short_math: 1;
+};
+typedef struct pms_t pms_t;
+
+void pms_init(pms_t* pms)
+{
+	(void)pms;
+}
+
+void pms_cleanup(pms_t* pms)
+{
+	(void)pms;
+}
+
+struct pms_st_t
+{
+	unsigned int len;
+	unsigned int cap;
+	pms_t* array;
+};
+typedef struct pms_st_t pms_st_t;
+
+pms_t* pms_st_push(pms_st_t* pms_st)
+{
+	pms_st->len++;
+	ARRAY_RESIZE_IF_NEEDED(pms_st->len, pms_st->cap, pms_st->array, pms_t);
+	pms_init(&pms_st->array[pms_st->len-1]);
+	return &pms_st->array[pms_st->len-1];
+}
+
+void pms_st_pop(pms_st_t* pms_st)
+{
+	pms_st->len--;
+	pms_cleanup(&pms_st->array[pms_st->len]);
+}
+
+void pms_st_cleanup(pms_st_t* pms_st)
+{
+	while (pms_st->len > 0)
+	{
+		pms_st_pop(pms_st);
+	}
 }
 
 enum prog_type_t
@@ -197,7 +245,7 @@ typedef enum prog_type_t prog_type_t;
  * Sets the parsed_len parameter to the number of chars actually parsed,
  * but only if parsed_len is non-null. */
 int parse(const char* src, unsigned int prog_index, prog_table_t* table,
-	unsigned int* parsed_len, prog_type_t prog_type)
+	unsigned int* parsed_len, prog_type_t prog_type, pms_st_t* pms_st)
 {
 	unsigned int i = 0;
 	while (1)
@@ -208,8 +256,8 @@ int parse(const char* src, unsigned int prog_index, prog_table_t* table,
 			unsigned int sub_prog_index = prog_table_alloc_prog_index(table);
 			table->array[sub_prog_index] = (prog_t){0};
 			unsigned int parsed_len;
-			if (parse(&src[i+1],
-				sub_prog_index, table, &parsed_len, PROG_BRACKETS) != 0)
+			if (parse(&src[i+1], sub_prog_index, table, &parsed_len,
+				PROG_BRACKETS, pms_st) != 0)
 			{
 				return -1;
 			}
@@ -246,7 +294,7 @@ int parse(const char* src, unsigned int prog_index, prog_table_t* table,
 					instr->name = INSTR_SWAP_ANY;
 				break;
 				case 'd':
-					instr->name = INSTR_DUP_ANY;
+					instr->name = INSTR_DUPLICATE_ANY;
 				break;
 				case 'k':
 					instr->name = INSTR_KILL_ANY;
@@ -323,8 +371,7 @@ int parse(const char* src, unsigned int prog_index, prog_table_t* table,
 			}
 			if (src[i] == '\0')
 			{
-				fprintf(stderr, "Syntax warning: "
-					"Non terminated comment\n");
+				fprintf(stderr, "Syntax warning: Non terminated comment\n");
 			}
 			else
 			{
@@ -362,13 +409,17 @@ int parse_all(const char* src, prog_table_t* table)
 {
 	unsigned int prog_index = prog_table_alloc_prog_index(table);
 	table->array[prog_index] = (prog_t){0};
-	return parse(src, prog_index, table, NULL, PROG_FILE);
+	pms_st_t pms_st = {0};
+	*pms_st_push(&pms_st) = (pms_t){0};
+	int res = parse(src, prog_index, table, NULL, PROG_FILE, &pms_st);
+	pms_st_cleanup(&pms_st);
+	return res;
 }
 
-/* Write the C statements that do what is should do the given instruction. */
-void emit_c_instr(growstr_t* out_gs, const instr_t* instr)
+/* Write the C statements that do what should do the given instruction. */
+void emit_c_instr(gs_t* out_gs, const instr_t* instr)
 {
-	#define EMIT(...) growstr_append_f(out_gs, __VA_ARGS__)
+	#define EMIT(...) gs_append_f(out_gs, __VA_ARGS__)
 	switch (instr->name)
 	{
 		case INSTR_NOP:
@@ -392,7 +443,7 @@ void emit_c_instr(growstr_t* out_gs, const instr_t* instr)
 				"\t}\n"
 			);
 		break;
-		case INSTR_DUP_ANY:
+		case INSTR_DUPLICATE_ANY:
 			EMIT("\ts[i] = s[i-1];\n");
 			EMIT("\ti++;\n");
 		break;
@@ -464,7 +515,7 @@ void emit_c_instr(growstr_t* out_gs, const instr_t* instr)
 }
 
 /* Write the C statements that do what should do the given program. */
-void emit_c_prog(growstr_t* out_gs, const prog_t* prog)
+void emit_c_prog(gs_t* out_gs, const prog_t* prog)
 {
 	for (unsigned int i = 0; i < prog->len; i++)
 	{
@@ -473,9 +524,9 @@ void emit_c_prog(growstr_t* out_gs, const prog_t* prog)
 }
 
 /* Write the complete final ultimate valid C program. */
-void emit_c_all(growstr_t* out_gs, const prog_table_t* table)
+void emit_c_all(gs_t* out_gs, const prog_table_t* table)
 {
-	#define EMIT(...) growstr_append_f(out_gs, __VA_ARGS__)
+	#define EMIT(...) gs_append_f(out_gs, __VA_ARGS__)
 	EMIT("#include <stdio.h>\n");
 	EMIT("#include <stdint.h>\n");
 	EMIT("void exit(int);\n");
@@ -576,8 +627,8 @@ int main(int argc, char** argv)
 		return -1;
 	}
 
-	growstr_t out_gs;
-	growstr_init(&out_gs);
+	gs_t out_gs;
+	gs_init(&out_gs);
 
 	emit_c_all(&out_gs, &table);
 
@@ -585,6 +636,6 @@ int main(int argc, char** argv)
 	fputs(out_gs.str, out_file);
 	fclose(out_file);
 
-	growstr_cleanup(&out_gs);
+	gs_cleanup(&out_gs);
 	return 0;
 }
