@@ -13,18 +13,18 @@ contexts:
     - match: '#'
       scope: punctuation.definition.comment.begin.helv
       push: comment
-    - match: '\b(8|64)(,,|,)'
+    - match: '(8|64)(,,|,)'
       captures:
         1: storage.type.helv
-        2: punctuation.separator.helv
-    - match: '\b([a-z]+)(,,|,)'
+        2: storage.type.helv
+    - match: '([a-z]+)(,,|,)'
       captures:
         1: storage.type.helv
-        2: punctuation.separator.helv
-    - match: '\b([a-z]*)(;;|;)'
+        2: storage.type.helv
+    - match: '([a-z]*)(;;|;)'
       captures:
         1: storage.type.helv
-        2: punctuation.separator.helv
+        2: storage.type.helv
     - match: '[0-9]+'
       scope: constant.numeric.value.helv
     - match: 'x'

@@ -2,6 +2,7 @@
 Abreviation | Meaning
 ----------- | -------
 `alloc`     | allocate, allocation
+`c`         | character
 `cap`       | capacity
 `char`      | character
 `def`       | definition
@@ -12,6 +13,7 @@ Abreviation | Meaning
 `imm`       | immediate
 `init`      | initialize, initialization
 `instr`     | instruction
+`int`       | integer
 `pms`       | parsing mode set
 `prog`      | program
 `res`       | result
@@ -19,3 +21,4 @@ Abreviation | Meaning
 `src`       | source
 `st`        | stack
 `str`       | string
+`uint`      | unsigned integer

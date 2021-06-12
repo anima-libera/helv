@@ -1,14 +1,6 @@
 
 ## TODO
 
-- Add parsing modes with the syntax `mode;` and `mode;;`
-  - Example: `;ksd` is the same as `kill swap duplicate`
-    - Note that this uses the parsing mode that has an empty name, its ok
-  - Example: `m;+-*/%` is the same as `add sub mul div mod`
-    - Note that the `m` parsing mode includes the previous parsing mode
-    - So `m;ksd+-*/%` is the same as `kill swap duplicate add sub mul div mod`
-- Make it work
-
 - Make a preprocessor that supports
   - Macro definition
   - Macro expansion
@@ -48,6 +40,10 @@
 
 - Make a real readme
 
+- Add test suite features
+- Make a test suite
+- Make it work
+
 ## Ideas
 
 ### Interpreter, compile time execution and REPL
@@ -84,6 +80,20 @@ and the stdlib defines ways that can easily allocate stacks(!).
 
 Then the stdlib could provide ways to move the head to one of these allocated
 stacks. Could be nice ^^.
+
+### Optimizations
+
+Make an IR (Intermediary Representation) that decomposes elementary
+instructions into micro instructions that can interact with a stack and
+registers. It must support operands that can be from the stack to also can be
+immediate values.
+Then, make a data flow graph thing, and use it to optimize things.
+Examples of wanted optimisations:
+- `push_8 kill` optimized into `nop`
+- `push_8 call_pop` optimized into `call_8`
+
+Also, handle register allocation, it will allow serious optimisations for any
+assemby backend support thing.
 
 ### Language targets
 

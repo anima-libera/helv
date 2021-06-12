@@ -57,8 +57,8 @@ enum instr_name_t
 	INSTR_DIVIDE_UINT,
 	INSTR_MODULUS_UINT,
 	INSTR_PRINT_UINT_AS_CHAR,
-	INSTR_PRINT_UINT,
-	INSTR_PRINT_STACK,
+	INSTR_PRINT_UINT, /* TODO: remove and put in the stdlib */
+	INSTR_PRINT_STACK, /* TODO: remove and put in the stdlib */
 	INSTR_EXECUTE_CODEINDEX,
 	INSTR_IF_CODEINDEX,
 	INSTR_DOWHILE_CODEINDEX,
@@ -72,8 +72,6 @@ struct instr_t
 	{
 		uint64_t uint64;
 		char* string;
-		unsigned int code_index;
-		char* def_name;
 	};
 };
 typedef struct instr_t instr_t;
@@ -197,6 +195,11 @@ void pms_init(pms_t* pms)
 	*pms = (pms_t){0};
 }
 
+void pms_copy(const pms_t* pms_src, pms_t* pms_dts)
+{
+	*pms_dts = *pms_src;
+}
+
 void pms_cleanup(pms_t* pms)
 {
 	(void)pms;
@@ -210,11 +213,19 @@ struct pms_st_t
 };
 typedef struct pms_st_t pms_st_t;
 
-pms_t* pms_st_push(pms_st_t* pms_st)
+pms_t* pms_st_push_init(pms_st_t* pms_st)
 {
 	pms_st->len++;
 	ARRAY_RESIZE_IF_NEEDED(pms_st->len, pms_st->cap, pms_st->array, pms_t);
 	pms_init(&pms_st->array[pms_st->len-1]);
+	return &pms_st->array[pms_st->len-1];
+}
+
+pms_t* pms_st_duplicate(pms_st_t* pms_st)
+{
+	pms_st->len++;
+	ARRAY_RESIZE_IF_NEEDED(pms_st->len, pms_st->cap, pms_st->array, pms_t);
+	pms_copy(&pms_st->array[pms_st->len-2], &pms_st->array[pms_st->len-1]);
 	return &pms_st->array[pms_st->len-1];
 }
 
@@ -232,19 +243,24 @@ void pms_st_cleanup(pms_st_t* pms_st)
 	}
 }
 
-int char_is_math_operator(char c)
+int c_is_math_operator(char c)
 {
 	return c == '+' || c == '-' || c == '*' || c == '/' || c == '%';
 }
 
-int char_is_decimal_digit(char c)
+int c_is_decimal_digit(char c)
 {
 	return '0' <= c && c <= '9';
 }
 
-int char_is_lowercase_letter(char c)
+int c_is_lowercase(char c)
 {
 	return 'a' <= c && c <= 'z';
+}
+
+int c_is_name_char(char c)
+{
+	return c_is_lowercase(c) || c == '-';
 }
 
 /* Read-only stream that seems to have infinitly many '\0' on the right. */
@@ -291,6 +307,21 @@ int rs_startswith(const rs_t* rs, const char* pattern)
 	return str_startswith(&rs->str[rs->head_index], pattern);
 }
 
+unsigned int rs_word_len(const rs_t* rs, int (*c_is_word_char)(char c))
+{
+	unsigned int len = 0;
+	while (c_is_word_char(rs->str[rs->head_index + len]))
+	{
+		len++;
+	}
+	return len;
+}
+
+int rs_startswith_parsing_mode(const rs_t* rs, unsigned int* name_len)
+{
+	return rs_peek(rs, (*name_len = rs_word_len(rs, c_is_lowercase))) == ';';
+}
+
 enum prog_type_t
 {
 	PROG_FILE,
@@ -306,8 +337,34 @@ int parse_prog(rs_t* src_rs, unsigned int prog_index, prog_table_t* table,
 	#define TOP_PMS pms_st->array[pms_st->len-1]
 	while (1)
 	{
+		unsigned int a;
 		char c = rs_peek(src_rs, 0);
-		if (TOP_PMS.has_basic_short_math && char_is_math_operator(c))
+		if (rs_startswith_parsing_mode(src_rs, &a))
+		{
+			if (rs_peek(src_rs, a + 1) != ';') /* Ends with only one ";" */
+			{
+				if (!TOP_PMS.is_pop_after_use)
+				{
+					pms_st_duplicate(pms_st);
+					TOP_PMS.is_pop_after_use = 1;
+				}
+				src_rs->i += a + 1;
+			}
+			else
+			{
+				src_rs->i++;
+			}
+			if (a == 0)
+			{
+				TOP_PMS.has_basic_short = 1;
+			}
+			else if (a == 1 && c == 'm')
+			{
+				TOP_PMS.has_basic_short = 1;
+				TOP_PMS.has_basic_short_math = 1;
+			}
+		}
+		else if (TOP_PMS.has_basic_short_math && c_is_math_operator(c))
 		{
 			instr_t* instr = prog_alloc_instr(&table->array[prog_index]);
 			*instr = (instr_t){0};
@@ -322,7 +379,7 @@ int parse_prog(rs_t* src_rs, unsigned int prog_index, prog_table_t* table,
 			src_rs->i++;
 			continue;
 		}
-		else if (TOP_PMS.has_basic_short && char_is_lowercase_letter(c))
+		else if (TOP_PMS.has_basic_short && c_is_lowercase(c))
 		{
 			instr_t* instr = prog_alloc_instr(&table->array[prog_index]);
 			*instr = (instr_t){0};
@@ -350,6 +407,12 @@ int parse_prog(rs_t* src_rs, unsigned int prog_index, prog_table_t* table,
 		}
 		else if (c == '[')
 		{
+			int pop_pms_after = 0;
+			if (TOP_PMS.is_pop_after_use)
+			{
+				pop_pms_after = 1;
+				TOP_PMS.is_pop_after_use = 0;
+			}
 			unsigned int sub_prog_index = prog_table_alloc_prog_index(table);
 			table->array[sub_prog_index] = (prog_t){0};
 			src_rs->i++;
@@ -360,17 +423,34 @@ int parse_prog(rs_t* src_rs, unsigned int prog_index, prog_table_t* table,
 			}
 			if (rs_peek(src_rs, 0) == ']')
 			{
+				/* TODO: Change this ? Maybe ? */
 				src_rs->i++;
+			}
+			if (pop_pms_after)
+			{
+				pms_st_pop(pms_st);
 			}
 			*prog_alloc_instr(&table->array[prog_index]) = (instr_t){
 				.name = INSTR_PUSH_IMMUINT, .uint64 = sub_prog_index
 			};
 		}
-		else if (char_is_decimal_digit(c))
+		else if (c == ']')
+		{
+			if (TOP_PMS.is_pop_after_use)
+			{
+				pms_st_pop(pms_st);
+			}
+			if (prog_type == PROG_FILE)
+			{
+				fprintf(stderr, "Syntax warning: Too much closed brackets\n");
+			}
+			break;
+		}
+		else if (c_is_decimal_digit(c))
 		{
 			unsigned int imm_value = 0;
 			char d;
-			while (char_is_decimal_digit(d = rs_peek(src_rs, 0)))
+			while (c_is_decimal_digit(d = rs_peek(src_rs, 0)))
 			{
 				imm_value = imm_value * 10 + (d - '0');
 				src_rs->i++;
@@ -379,20 +459,12 @@ int parse_prog(rs_t* src_rs, unsigned int prog_index, prog_table_t* table,
 				.name = INSTR_PUSH_IMMUINT, .uint64 = imm_value
 			};
 		}
-		else if (rs_startswith(src_rs, "m;;"))
-		{
-			pms_st->array[pms_st->len-1].has_basic_short = 1;
-			pms_st->array[pms_st->len-1].has_basic_short_math = 1;
-			src_rs->i += 3;
-		}
-		else if (char_is_math_operator(c))
-		{
-			fprintf(stderr, "\x1b[31mSyntax error: "
-				"Unexpected math operator %c (%d)\x1b[39m\n", c, (int)c);
-			return -1;
-		}
 		else if (c == ' ' || c == '\n' || c == '\t')
 		{
+			if (TOP_PMS.is_pop_after_use)
+			{
+				pms_st_pop(pms_st);
+			}
 			src_rs->i++;
 		}
 		else if (c == '#')
@@ -411,17 +483,19 @@ int parse_prog(rs_t* src_rs, unsigned int prog_index, prog_table_t* table,
 				src_rs->i++;
 			}
 		}
-		else if (c == '\0' || c == ']')
+		else if (c == '\0')
 		{
-			if (prog_type == PROG_BRACKETS && c != ']')
+			if (prog_type == PROG_BRACKETS)
 			{
 				fprintf(stderr, "Syntax warning: Non closed brackets\n");
 			}
-			else if (prog_type == PROG_FILE && c == ']')
-			{
-				fprintf(stderr, "Syntax warning: Too much closed brackets\n");
-			}
 			break;
+		}
+		else if (c_is_math_operator(c))
+		{
+			fprintf(stderr, "\x1b[31mSyntax error: "
+				"Unexpected math operator %c (%d)\x1b[39m\n", c, (int)c);
+			return -1;
 		}
 		else
 		{
@@ -440,7 +514,7 @@ int parse_all(const char* src, prog_table_t* table)
 	unsigned int prog_index = prog_table_alloc_prog_index(table);
 	table->array[prog_index] = (prog_t){0};
 	pms_st_t pms_st = {0};
-	*pms_st_push(&pms_st) = (pms_t){0};
+	*pms_st_push_init(&pms_st) = (pms_t){0};
 	rs_t src_rs;
 	rs_init(&src_rs, src);
 	int res = parse_prog(&src_rs, prog_index, table, PROG_FILE, &pms_st);
