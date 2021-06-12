@@ -17,7 +17,7 @@ int g_debug = 0;
 
 #ifdef ENABLE_ASSERT
 #define ASSERT(condition_) ((condition_) ? ((void)0) : (void)fprintf(stderr, \
-	"Assertion failed: At %d in function %s in file " __FILE__ "\n", \
+	"Assertion failed: At line %d in function %s in file " __FILE__ "\n", \
 	__LINE__, __func__))
 #else
 #define ASSERT(condition_) ((void)0)
@@ -52,14 +52,13 @@ enum instr_name_t
 	INSTR_DUPLICATE_ANY,
 	INSTR_KILL_ANY,
 	INSTR_ADD_UINT,
-	INSTR_SUB_UINT,
-	INSTR_MUL_UINT,
-	INSTR_DIV_UINT,
-	INSTR_MOD_UINT,
+	INSTR_SUBTRACT_UINT,
+	INSTR_MULTIPLY_UINT,
+	INSTR_DIVIDE_UINT,
+	INSTR_MODULUS_UINT,
 	INSTR_PRINT_UINT_AS_CHAR,
 	INSTR_PRINT_UINT,
 	INSTR_PRINT_STACK,
-	INSTR_PUSH_IMMCODEINDEX,
 	INSTR_EXECUTE_CODEINDEX,
 	INSTR_IF_CODEINDEX,
 	INSTR_DOWHILE_CODEINDEX,
@@ -94,10 +93,10 @@ instr_t* prog_alloc_instr(prog_t* prog)
 	return &prog->array[prog->len-1];
 }
 
-/* Growable string */
+/* Growable string. */
 struct gs_t
 {
-	unsigned int len; /* Counts in the null terminator */
+	unsigned int len; /* Including the null terminator. */
 	unsigned int cap;
 	char* str;
 };
@@ -184,10 +183,10 @@ unsigned int prog_table_alloc_prog_index(prog_table_t* table)
 	return table->len-1;
 }
 
-/* Parsing mode set */
+/* Parsing mode set. */
 struct pms_t
 {
-	unsigned int is_pop_after_use: 1; /* The `;` syntax instead of `;;` */
+	unsigned int is_pop_after_use: 1; /* The `;` syntax instead of `;;`. */
 	unsigned int has_basic_short: 1;
 	unsigned int has_basic_short_math: 1;
 };
@@ -195,7 +194,7 @@ typedef struct pms_t pms_t;
 
 void pms_init(pms_t* pms)
 {
-	(void)pms;
+	*pms = (pms_t){0};
 }
 
 void pms_cleanup(pms_t* pms)
@@ -233,6 +232,65 @@ void pms_st_cleanup(pms_st_t* pms_st)
 	}
 }
 
+int char_is_math_operator(char c)
+{
+	return c == '+' || c == '-' || c == '*' || c == '/' || c == '%';
+}
+
+int char_is_decimal_digit(char c)
+{
+	return '0' <= c && c <= '9';
+}
+
+int char_is_lowercase_letter(char c)
+{
+	return 'a' <= c && c <= 'z';
+}
+
+/* Read-only stream that seems to have infinitly many '\0' on the right. */
+struct rs_t
+{
+	const char* str;
+	unsigned int len; /* Excluding the null terminator. */
+	union {
+		unsigned int head_index;
+		unsigned int i;
+	};
+};
+typedef struct rs_t rs_t;
+
+void rs_init(rs_t* rs, const char* str)
+{
+	rs->str = str;
+	rs->len = strlen(str);
+	rs->head_index = 0;
+}
+
+void rs_cleanup(rs_t* rs)
+{
+	(void)rs;
+}
+
+/* Gets the character at index head_index + head_offset. */
+char rs_peek(const rs_t* rs, int head_offset)
+{
+	int index = (int)rs->head_index + head_offset;
+	ASSERT(index >= 0);
+	if ((unsigned int)index >= rs->len)
+	{
+		return '\0';
+	}
+	else
+	{
+		return rs->str[index];
+	}
+}
+
+int rs_startswith(const rs_t* rs, const char* pattern)
+{
+	return str_startswith(&rs->str[rs->head_index], pattern);
+}
+
 enum prog_type_t
 {
 	PROG_FILE,
@@ -241,141 +299,116 @@ enum prog_type_t
 typedef enum prog_type_t prog_type_t;
 
 /* Parse the given string as a program, such as the content of a [ ] block.
- * Returns non-zero on error.
- * Sets the parsed_len parameter to the number of chars actually parsed,
- * but only if parsed_len is non-null. */
-int parse(const char* src, unsigned int prog_index, prog_table_t* table,
-	unsigned int* parsed_len, prog_type_t prog_type, pms_st_t* pms_st)
+ * Returns non-zero on error. */
+int parse_prog(rs_t* src_rs, unsigned int prog_index, prog_table_t* table,
+	prog_type_t prog_type, pms_st_t* pms_st)
 {
-	unsigned int i = 0;
+	#define TOP_PMS pms_st->array[pms_st->len-1]
 	while (1)
 	{
-		char c = src[i];
-		if (c == '[')
-		{
-			unsigned int sub_prog_index = prog_table_alloc_prog_index(table);
-			table->array[sub_prog_index] = (prog_t){0};
-			unsigned int parsed_len;
-			if (parse(&src[i+1], sub_prog_index, table, &parsed_len,
-				PROG_BRACKETS, pms_st) != 0)
-			{
-				return -1;
-			}
-			i += 1 + parsed_len;
-			if (src[i] == ']')
-			{
-				i++;
-			}
-			*prog_alloc_instr(&table->array[prog_index]) = (instr_t){
-				.name = INSTR_PUSH_IMMCODEINDEX, .code_index = sub_prog_index
-			};
-		}
-		else if ('0' <= c && c <= '9')
-		{
-			unsigned int j;
-			unsigned int constant_value = 0;
-			for (j = i; '0' <= src[j] && src[j] <= '9'; j++)
-			{
-				constant_value *= 10;
-				constant_value += src[j] - '0';
-			}
-			*prog_alloc_instr(&table->array[prog_index]) = (instr_t){
-				.name = INSTR_PUSH_IMMUINT, .uint64 = constant_value
-			};
-			i = j;
-		}
-		else if ('a' <= c && c <= 'z')
+		char c = rs_peek(src_rs, 0);
+		if (TOP_PMS.has_basic_short_math && char_is_math_operator(c))
 		{
 			instr_t* instr = prog_alloc_instr(&table->array[prog_index]);
 			*instr = (instr_t){0};
 			switch (c)
 			{
-				case 's':
-					instr->name = INSTR_SWAP_ANY;
-				break;
-				case 'd':
-					instr->name = INSTR_DUPLICATE_ANY;
-				break;
-				case 'k':
-					instr->name = INSTR_KILL_ANY;
-				break;
-				case 'm':
-					switch (src[i+1])
-					{
-						case '+':
-							instr->name = INSTR_ADD_UINT;
-						break;
-						case '-':
-							instr->name = INSTR_SUB_UINT;
-						break;
-						case '*':
-							instr->name = INSTR_MUL_UINT;
-						break;
-						case '/':
-							instr->name = INSTR_DIV_UINT;
-						break;
-						case '%':
-							instr->name = INSTR_MOD_UINT;
-						break;
-						default:
-							fprintf(stderr, "\x1b[31mSyntax error: "
-								"Unknown math instr %c (%d)\x1b[39m\n",
-								src[i+1], (int)src[i+1]);
-						break;
-					}
-					i++;
-				break;
-				case 'p':
-					instr->name = INSTR_PRINT_UINT_AS_CHAR;
-				break;
-				case 'u':
-					instr->name = INSTR_PRINT_UINT;
-				break;
-				case 'a':
-					instr->name = INSTR_PRINT_STACK;
-				break;
-				case 'x':
-					instr->name = INSTR_EXECUTE_CODEINDEX;
-				break;
-				case 'i':
-					instr->name = INSTR_IF_CODEINDEX;
-				break;
-				case 'l':
-					instr->name = INSTR_DOWHILE_CODEINDEX;
-				break;
-				case 'n':
-					instr->name = INSTR_NOP;
-				break;
-				case 'h':
-					instr->name = src[i+1] == 'h' ?
-						INSTR_GLOBAL_HALT : INSTR_LOCAL_HALT;
-				break;
+				case '+': instr->name = INSTR_ADD_UINT;      break;
+				case '-': instr->name = INSTR_SUBTRACT_UINT; break;
+				case '*': instr->name = INSTR_MULTIPLY_UINT; break;
+				case '/': instr->name = INSTR_DIVIDE_UINT;   break;
+				case '%': instr->name = INSTR_MODULUS_UINT;  break;
+			}
+			src_rs->i++;
+			continue;
+		}
+		else if (TOP_PMS.has_basic_short && char_is_lowercase_letter(c))
+		{
+			instr_t* instr = prog_alloc_instr(&table->array[prog_index]);
+			*instr = (instr_t){0};
+			switch (c)
+			{
+				case 's': instr->name = INSTR_SWAP_ANY;           break;
+				case 'd': instr->name = INSTR_DUPLICATE_ANY;      break;
+				case 'k': instr->name = INSTR_KILL_ANY;           break;
+				case 'p': instr->name = INSTR_PRINT_UINT_AS_CHAR; break;
+				case 'u': instr->name = INSTR_PRINT_UINT;         break;
+				case 'a': instr->name = INSTR_PRINT_STACK;        break;
+				case 'x': instr->name = INSTR_EXECUTE_CODEINDEX;  break;
+				case 'i': instr->name = INSTR_IF_CODEINDEX;       break;
+				case 'l': instr->name = INSTR_DOWHILE_CODEINDEX;  break;
+				case 'n': instr->name = INSTR_NOP;                break;
+				case 'h': instr->name = INSTR_LOCAL_HALT;         break;
 				default:
 					fprintf(stderr, "\x1b[31mSyntax error: "
 						"Unknown instr %c (%d)\x1b[39m\n", c, (int)c);
 					return -1;
 				break;
 			}
-			i++;
+			src_rs->i++;
+			continue;
+		}
+		else if (c == '[')
+		{
+			unsigned int sub_prog_index = prog_table_alloc_prog_index(table);
+			table->array[sub_prog_index] = (prog_t){0};
+			src_rs->i++;
+			if (parse_prog(src_rs, sub_prog_index, table,
+				PROG_BRACKETS, pms_st) != 0)
+			{
+				return -1;
+			}
+			if (rs_peek(src_rs, 0) == ']')
+			{
+				src_rs->i++;
+			}
+			*prog_alloc_instr(&table->array[prog_index]) = (instr_t){
+				.name = INSTR_PUSH_IMMUINT, .uint64 = sub_prog_index
+			};
+		}
+		else if (char_is_decimal_digit(c))
+		{
+			unsigned int imm_value = 0;
+			char d;
+			while (char_is_decimal_digit(d = rs_peek(src_rs, 0)))
+			{
+				imm_value = imm_value * 10 + (d - '0');
+				src_rs->i++;
+			}
+			*prog_alloc_instr(&table->array[prog_index]) = (instr_t){
+				.name = INSTR_PUSH_IMMUINT, .uint64 = imm_value
+			};
+		}
+		else if (rs_startswith(src_rs, "m;;"))
+		{
+			pms_st->array[pms_st->len-1].has_basic_short = 1;
+			pms_st->array[pms_st->len-1].has_basic_short_math = 1;
+			src_rs->i += 3;
+		}
+		else if (char_is_math_operator(c))
+		{
+			fprintf(stderr, "\x1b[31mSyntax error: "
+				"Unexpected math operator %c (%d)\x1b[39m\n", c, (int)c);
+			return -1;
 		}
 		else if (c == ' ' || c == '\n' || c == '\t')
 		{
-			i++;
+			src_rs->i++;
 		}
 		else if (c == '#')
 		{
-			i++;
-			while (src[i] != '#' && src[i] != '\0')
+			src_rs->i++;
+			while (rs_peek(src_rs, 0) != '#' && rs_peek(src_rs, 0) != '\0')
 			{
-				i++;
+				src_rs->i++;
 			}
-			if (src[i] == '\0')
+			if (rs_peek(src_rs, 0) == '\0')
 			{
 				fprintf(stderr, "Syntax warning: Non terminated comment\n");
 			}
 			else
 			{
-				i++;
+				src_rs->i++;
 			}
 		}
 		else if (c == '\0' || c == ']')
@@ -397,11 +430,8 @@ int parse(const char* src, unsigned int prog_index, prog_table_t* table,
 			return -1;
 		}
 	}
-	if (parsed_len != NULL)
-	{
-		*parsed_len = i;
-	}
 	return 0;
+	#undef TOP_PMS
 }
 
 /* Parse the given string as a complete Helv program. */
@@ -411,9 +441,82 @@ int parse_all(const char* src, prog_table_t* table)
 	table->array[prog_index] = (prog_t){0};
 	pms_st_t pms_st = {0};
 	*pms_st_push(&pms_st) = (pms_t){0};
-	int res = parse(src, prog_index, table, NULL, PROG_FILE, &pms_st);
+	rs_t src_rs;
+	rs_init(&src_rs, src);
+	int res = parse_prog(&src_rs, prog_index, table, PROG_FILE, &pms_st);
+	rs_cleanup(&src_rs);
 	pms_st_cleanup(&pms_st);
 	return res;
+}
+
+void prog_table_print(const prog_table_t* table)
+{
+	for (unsigned int i = 0; i < table->len; i++)
+	{
+		printf("prog %d:\n", (int)i);
+		prog_t* prog = &table->array[i];
+		for (unsigned int j = 0; j < prog->len; j++)
+		{
+			instr_t* instr = &prog->array[j];
+			switch (instr->name)
+			{
+				case INSTR_NOP:
+					printf("\tnop\n");
+				break;
+				case INSTR_GLOBAL_HALT:
+					printf("\tglobal_halt\n");
+				break;
+				case INSTR_LOCAL_HALT:
+					printf("\tlocal_halt\n");
+				break;
+				case INSTR_PUSH_IMMUINT:
+					printf("\tpush_immuint %u\n", (unsigned int)instr->uint64);
+				break;
+				case INSTR_SWAP_ANY:
+					printf("\tswap_any\n");
+				break;
+				case INSTR_DUPLICATE_ANY:
+					printf("\tduplicate_any\n");
+				break;
+				case INSTR_KILL_ANY:
+					printf("\tkill_any\n");
+				break;
+				case INSTR_ADD_UINT:
+					printf("\tadd_uint\n");
+				break;
+				case INSTR_SUBTRACT_UINT:
+					printf("\tsubtract_uint\n");
+				break;
+				case INSTR_MULTIPLY_UINT:
+					printf("\tmultiply_uint\n");
+				break;
+				case INSTR_DIVIDE_UINT:
+					printf("\tdivide_uint\n");
+				break;
+				case INSTR_MODULUS_UINT:
+					printf("\tmodulus_uint\n");
+				break;
+				case INSTR_PRINT_UINT_AS_CHAR:
+					printf("\tprint_uint_as_char\n");
+				break;
+				case INSTR_PRINT_UINT:
+					printf("\tprint_uint\n");
+				break;
+				case INSTR_PRINT_STACK:
+					printf("\tprint_stack\n");
+				break;
+				case INSTR_EXECUTE_CODEINDEX:
+					printf("\texecute_codeindex\n");
+				break;
+				case INSTR_IF_CODEINDEX:
+					printf("\tif_codeindex\n");
+				break;
+				case INSTR_DOWHILE_CODEINDEX:
+					printf("\tdowhile_codeindex\n");
+				break;
+			}
+		}
+	}
 }
 
 /* Write the C statements that do what should do the given instruction. */
@@ -454,19 +557,19 @@ void emit_c_instr(gs_t* out_gs, const instr_t* instr)
 			EMIT("\ts[i-2] = s[i-1] + s[i-2];\n");
 			EMIT("\ti--;\n");
 		break;
-		case INSTR_SUB_UINT:
+		case INSTR_SUBTRACT_UINT:
 			EMIT("\ts[i-2] = s[i-1] - s[i-2];\n");
 			EMIT("\ti--;\n");
 		break;
-		case INSTR_MUL_UINT:
+		case INSTR_MULTIPLY_UINT:
 			EMIT("\ts[i-2] = s[i-1] * s[i-2];\n");
 			EMIT("\ti--;\n");
 		break;
-		case INSTR_DIV_UINT:
+		case INSTR_DIVIDE_UINT:
 			EMIT("\ts[i-2] = s[i-1] / s[i-2];\n");
 			EMIT("\ti--;\n");
 		break;
-		case INSTR_MOD_UINT:
+		case INSTR_MODULUS_UINT:
 			EMIT("\ts[i-2] = s[i-1] %% s[i-2];\n");
 			EMIT("\ti--;\n");
 		break;
@@ -482,9 +585,6 @@ void emit_c_instr(gs_t* out_gs, const instr_t* instr)
 			EMIT("\t\tprintf(\"%%d \", (int)s[j]);\n");
 			EMIT("\t}\n");
 			EMIT("\tprintf(\"%%d\\n\", (int)s[i-1]);\n");
-		break;
-		case INSTR_PUSH_IMMCODEINDEX:
-			EMIT("\ts[i++] = %d;\n", instr->code_index);
 		break;
 		case INSTR_EXECUTE_CODEINDEX:
 			EMIT("\tprog_table[s[--i]]();\n");
@@ -625,6 +725,11 @@ int main(int argc, char** argv)
 	if (parse_all(src, &table) != 0)
 	{
 		return -1;
+	}
+
+	if (g_debug)
+	{
+		prog_table_print(&table);
 	}
 
 	gs_t out_gs;

@@ -1,8 +1,6 @@
 
 ## TODO
 
-- Make the arithmetic operations syntax look better
-  - By doing the next task
 - Add parsing modes with the syntax `mode;` and `mode;;`
   - Example: `;ksd` is the same as `kill swap duplicate`
     - Note that this uses the parsing mode that has an empty name, its ok
@@ -11,9 +9,9 @@
     - So `m;ksd+-*/%` is the same as `kill swap duplicate add sub mul div mod`
 - Make it work
 
-- Make a preprocessor (with a stream type) that supports
-  - Macro definition (all macro names start with `_`)
-  - Macro expansion (all macro names start with `_`)
+- Make a preprocessor that supports
+  - Macro definition
+  - Macro expansion
 - Make it work
 
 - Add file inclusion support for the preprocessor
@@ -30,7 +28,7 @@
 - Add the modes `64` and `8`
 - Make it work
 
-- Add ways to push and pop `modes_t`
+- Add ways to manually push and pop `modes_t`
   - Like blocks that push a copy of the top `modes_t` and pop it at the end
   - Or directives to manipulate the `modes_t` stack
 - Make it work
