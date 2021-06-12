@@ -60,10 +60,35 @@ enum instr_name_t
 	INSTR_PRINT_UINT, /* TODO: remove and put in the stdlib */
 	INSTR_PRINT_STACK, /* TODO: remove and put in the stdlib */
 	INSTR_EXECUTE_CODEINDEX,
-	INSTR_IF_CODEINDEX,
+	INSTR_IFELSE_CODEINDEX,
 	INSTR_DOWHILE_CODEINDEX,
 };
 typedef enum instr_name_t instr_name_t;
+
+/* Strings instruction name */
+struct sin_t
+{
+	char* str;
+	char* str3; /* Three-chars abreviation of the classic name, can be NULL */
+	char one_char; /* For the ";"/";;" mode, none is '\0' */
+	instr_name_t name;
+};
+typedef struct sin_t sin_t;
+
+struct sin_map_t
+{
+	unsigned int len;
+	unsigned int cap;
+	sin_t* array;
+};
+typedef struct sin_map_t sin_map_t;
+
+sin_t* sin_map_alloc_sin(sin_map_t* map)
+{
+	map->len++;
+	ARRAY_RESIZE_IF_NEEDED(map->len, map->cap, map->array, sin_t);
+	return &map->array[map->len-1];
+}
 
 struct instr_t
 {
@@ -332,7 +357,7 @@ typedef enum prog_type_t prog_type_t;
 /* Parse the given string as a program, such as the content of a [ ] block.
  * Returns non-zero on error. */
 int parse_prog(rs_t* src_rs, unsigned int prog_index, prog_table_t* table,
-	prog_type_t prog_type, pms_st_t* pms_st)
+	prog_type_t prog_type, pms_st_t* pms_st, sin_map_t* sinm)
 {
 	#define TOP_PMS pms_st->array[pms_st->len-1]
 	while (1)
@@ -364,46 +389,44 @@ int parse_prog(rs_t* src_rs, unsigned int prog_index, prog_table_t* table,
 				TOP_PMS.has_basic_short_math = 1;
 			}
 		}
-		else if (TOP_PMS.has_basic_short_math && c_is_math_operator(c))
+		else if (c_is_lowercase(c)
+			|| (TOP_PMS.has_basic_short_math && c_is_math_operator(c)))
 		{
-			instr_t* instr = prog_alloc_instr(&table->array[prog_index]);
-			*instr = (instr_t){0};
-			switch (c)
+			if (TOP_PMS.has_basic_short) /* Implied by short math */
 			{
-				case '+': instr->name = INSTR_ADD_UINT;      break;
-				case '-': instr->name = INSTR_SUBTRACT_UINT; break;
-				case '*': instr->name = INSTR_MULTIPLY_UINT; break;
-				case '/': instr->name = INSTR_DIVIDE_UINT;   break;
-				case '%': instr->name = INSTR_MODULUS_UINT;  break;
+				for (unsigned int i = 0; i < sinm->len; i++)
+				{
+					if (c == sinm->array[i].one_char)
+					{
+						*prog_alloc_instr(&table->array[prog_index]) = 
+							(instr_t){.name = sinm->array[i].name};
+						src_rs->i++;
+						break;
+					}
+				}
 			}
-			src_rs->i++;
-			continue;
-		}
-		else if (TOP_PMS.has_basic_short && c_is_lowercase(c))
-		{
-			instr_t* instr = prog_alloc_instr(&table->array[prog_index]);
-			*instr = (instr_t){0};
-			switch (c)
+			else
 			{
-				case 's': instr->name = INSTR_SWAP_ANY;           break;
-				case 'd': instr->name = INSTR_DUPLICATE_ANY;      break;
-				case 'k': instr->name = INSTR_KILL_ANY;           break;
-				case 'p': instr->name = INSTR_PRINT_UINT_AS_CHAR; break;
-				case 'u': instr->name = INSTR_PRINT_UINT;         break;
-				case 'a': instr->name = INSTR_PRINT_STACK;        break;
-				case 'x': instr->name = INSTR_EXECUTE_CODEINDEX;  break;
-				case 'i': instr->name = INSTR_IF_CODEINDEX;       break;
-				case 'l': instr->name = INSTR_DOWHILE_CODEINDEX;  break;
-				case 'n': instr->name = INSTR_NOP;                break;
-				case 'h': instr->name = INSTR_LOCAL_HALT;         break;
-				default:
-					fprintf(stderr, "\x1b[31mSyntax error: "
-						"Unknown instr %c (%d)\x1b[39m\n", c, (int)c);
-					return -1;
-				break;
+				for (unsigned int i = 0; i < sinm->len; i++)
+				{
+					if (rs_startswith(src_rs, sinm->array[i].str))
+					{
+						*prog_alloc_instr(&table->array[prog_index]) = 
+							(instr_t){.name = sinm->array[i].name};
+						src_rs->i += strlen(sinm->array[i].str);
+						/* TODO: Optimize away this stupid strlen call! */
+						break;
+					}
+					else if (sinm->array[i].str3 != NULL
+						&& rs_startswith(src_rs, sinm->array[i].str3))
+					{
+						*prog_alloc_instr(&table->array[prog_index]) = 
+							(instr_t){.name = sinm->array[i].name};
+						src_rs->i += 3;
+						break;
+					}
+				}
 			}
-			src_rs->i++;
-			continue;
 		}
 		else if (c == '[')
 		{
@@ -417,7 +440,7 @@ int parse_prog(rs_t* src_rs, unsigned int prog_index, prog_table_t* table,
 			table->array[sub_prog_index] = (prog_t){0};
 			src_rs->i++;
 			if (parse_prog(src_rs, sub_prog_index, table,
-				PROG_BRACKETS, pms_st) != 0)
+				PROG_BRACKETS, pms_st, sinm) != 0)
 			{
 				return -1;
 			}
@@ -509,7 +532,7 @@ int parse_prog(rs_t* src_rs, unsigned int prog_index, prog_table_t* table,
 }
 
 /* Parse the given string as a complete Helv program. */
-int parse_all(const char* src, prog_table_t* table)
+int parse_all(const char* src, sin_map_t* sinm, prog_table_t* table)
 {
 	unsigned int prog_index = prog_table_alloc_prog_index(table);
 	table->array[prog_index] = (prog_t){0};
@@ -517,7 +540,7 @@ int parse_all(const char* src, prog_table_t* table)
 	*pms_st_push_init(&pms_st) = (pms_t){0};
 	rs_t src_rs;
 	rs_init(&src_rs, src);
-	int res = parse_prog(&src_rs, prog_index, table, PROG_FILE, &pms_st);
+	int res = parse_prog(&src_rs, prog_index, table, PROG_FILE, &pms_st, sinm);
 	rs_cleanup(&src_rs);
 	pms_st_cleanup(&pms_st);
 	return res;
@@ -582,7 +605,7 @@ void prog_table_print(const prog_table_t* table)
 				case INSTR_EXECUTE_CODEINDEX:
 					printf("\texecute_codeindex\n");
 				break;
-				case INSTR_IF_CODEINDEX:
+				case INSTR_IFELSE_CODEINDEX:
 					printf("\tif_codeindex\n");
 				break;
 				case INSTR_DOWHILE_CODEINDEX:
@@ -663,7 +686,7 @@ void emit_c_instr(gs_t* out_gs, const instr_t* instr)
 		case INSTR_EXECUTE_CODEINDEX:
 			EMIT("\tprog_table[s[--i]]();\n");
 		break;
-		case INSTR_IF_CODEINDEX:
+		case INSTR_IFELSE_CODEINDEX:
 			EMIT("\t{\n");
 			EMIT("\t\tuint64_t condition = s[--i];\n");
 			EMIT("\t\tuint64_t index_if = s[--i];\n");
@@ -794,9 +817,71 @@ int main(int argc, char** argv)
 
 	char* src = read_file(src_file_path);
 
+	sin_map_t sinm = {0};
+	*sin_map_alloc_sin(&sinm) = (sin_t){
+		.name = INSTR_NOP,
+		.str = "nop", .str3 = "nop", .one_char = 'n',
+	};
+	*sin_map_alloc_sin(&sinm) = (sin_t){
+		.name = INSTR_GLOBAL_HALT,
+		.str = "ghalt", .str3 = NULL, .one_char = '\0',
+	};
+	*sin_map_alloc_sin(&sinm) = (sin_t){
+		.name = INSTR_LOCAL_HALT,
+		.str = "halt", .str3 = "hlt", .one_char = 'h',
+	};
+	*sin_map_alloc_sin(&sinm) = (sin_t){
+		.name = INSTR_SWAP_ANY,
+		.str = "swap", .str3 = "swp", .one_char = 's',
+	};
+	*sin_map_alloc_sin(&sinm) = (sin_t){
+		.name = INSTR_DUPLICATE_ANY,
+		.str = "duplicate", .str3 = "dup", .one_char = 'd',
+	};
+	*sin_map_alloc_sin(&sinm) = (sin_t){
+		.name = INSTR_KILL_ANY,
+		.str = "kill", .str3 = "kil", .one_char = 'k',
+	};
+	*sin_map_alloc_sin(&sinm) = (sin_t){
+		.name = INSTR_ADD_UINT,
+		.str = "add", .str3 = "add", .one_char = '+',
+	};
+	*sin_map_alloc_sin(&sinm) = (sin_t){
+		.name = INSTR_SUBTRACT_UINT,
+		.str = "substract", .str3 = "sub", .one_char = '-',
+	};
+	*sin_map_alloc_sin(&sinm) = (sin_t){
+		.name = INSTR_MULTIPLY_UINT,
+		.str = "multiply", .str3 = "mul", .one_char = '*',
+	};
+	*sin_map_alloc_sin(&sinm) = (sin_t){
+		.name = INSTR_DIVIDE_UINT,
+		.str = "divide", .str3 = "div", .one_char = '/',
+	};
+	*sin_map_alloc_sin(&sinm) = (sin_t){
+		.name = INSTR_MODULUS_UINT,
+		.str = "modulus", .str3 = "mod", .one_char = '%',
+	};
+	*sin_map_alloc_sin(&sinm) = (sin_t){
+		.name = INSTR_PRINT_UINT_AS_CHAR,
+		.str = "print", .str3 = "prt", .one_char = 'p',
+	};
+	*sin_map_alloc_sin(&sinm) = (sin_t){
+		.name = INSTR_EXECUTE_CODEINDEX,
+		.str = "execute", .str3 = "exe", .one_char = 'x',
+	};
+	*sin_map_alloc_sin(&sinm) = (sin_t){
+		.name = INSTR_IFELSE_CODEINDEX,
+		.str = "ifelse", .str3 = "ife", .one_char = 'i',
+	};
+	*sin_map_alloc_sin(&sinm) = (sin_t){
+		.name = INSTR_DOWHILE_CODEINDEX,
+		.str = "dowhile", .str3 = "dwl", .one_char = 'l',
+	};
+
 	prog_table_t table = {0};
 
-	if (parse_all(src, &table) != 0)
+	if (parse_all(src, &sinm, &table) != 0)
 	{
 		return -1;
 	}

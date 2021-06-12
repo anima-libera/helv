@@ -81,9 +81,9 @@ and the stdlib defines ways that can easily allocate stacks(!).
 Then the stdlib could provide ways to move the head to one of these allocated
 stacks. Could be nice ^^.
 
-### Optimizations
+### Optimizations of the compiled program
 
-Make an IR (Intermediary Representation) that decomposes elementary
+Make an IR (Intermediate Representation) that decomposes elementary
 instructions into micro instructions that can interact with a stack and
 registers. It must support operands that can be from the stack to also can be
 immediate values.
@@ -94,6 +94,15 @@ Examples of wanted optimisations:
 
 Also, handle register allocation, it will allow serious optimisations for any
 assemby backend support thing.
+
+### Optimizations of the compiler
+
+Lets keep that for the far future, don't forget what Knuth-sama once said about
+early optimizations.
+
+There are things in the compiler that were optimized (kind-of) and
+that were unoptimized into obviously unefficient code, for reasons.
+And for now I don't care, but one day I will care.
 
 ### Language targets
 

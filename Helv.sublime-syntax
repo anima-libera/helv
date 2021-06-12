@@ -9,6 +9,48 @@ version: 2
 
 contexts:
 
+  short:
+    - match: 'x'
+      scope: keyword.other.helv
+    - match: 'i'
+      scope: keyword.control.conditional.if.helv
+    - match: 'l'
+      scope: keyword.control.loop.do-while.helv
+    - match: 'h'
+      scope: keyword.control.flow.return.helv
+
+  short_math:
+    - match: '\+|\-|\*|\/|\%'
+      scope: keyword.operator.arithmetic.helv
+
+  long:
+    - match: '\b(duplicate|dup)\b'
+    - match: '\b(nop)\b'
+    - match: '\b(ghalt|halt|hlt)\b'
+      scope: keyword.control.flow.return.helv
+    - match: '\b(swap|swp)\b'
+    - match: '\b(duplicate|dup)\b'
+    - match: '\b(kill|kil)\b'
+    - match: '\b(print|prt)\b'
+    - match: '\b(execute|exe)\b'
+      scope: keyword.other.helv
+    - match: '\b(ifelse|ife)\b'
+      scope: keyword.control.conditional.if.helv
+    - match: '\b(dowhile|dwl)\b'
+      scope: keyword.control.loop.do-while.helv
+
+  long_math:
+    - match: '\b(add)\b'
+      scope: keyword.operator.arithmetic.helv
+    - match: '\b(subtract|sub)\b'
+      scope: keyword.operator.arithmetic.helv
+    - match: '\b(multiply|mul)\b'
+      scope: keyword.operator.arithmetic.helv
+    - match: '\b(divide|div)\b'
+      scope: keyword.operator.arithmetic.helv
+    - match: '\b(modulus|mod)\b'
+      scope: keyword.operator.arithmetic.helv
+
   main:
     - match: '#'
       scope: punctuation.definition.comment.begin.helv
@@ -27,16 +69,13 @@ contexts:
         2: storage.type.helv
     - match: '[0-9]+'
       scope: constant.numeric.value.helv
-    - match: 'x'
-      scope: keyword.other.helv
-    - match: 'i'
-      scope: keyword.control.conditional.if.helv
-    - match: 'l'
-      scope: keyword.control.loop.do-while.helv
-    - match: 'h'
-      scope: keyword.control.flow.return.helv
-    - match: '\+|\-|\*|\/|\%'
-      scope: keyword.operator.arithmetic.helv
+    - include: long
+    - include: long_math
+    - include: short
+    - include: short_math
+    #- match: '[a-z]+'
+    #  scope: keyword.helv
+    - include: short_math
     - match: '\['
       scope: punctuation.section.brackets.begin.helv
       push: bracket
