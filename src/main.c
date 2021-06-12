@@ -430,11 +430,13 @@ int parse_prog(rs_t* src_rs, unsigned int prog_index, prog_table_t* table,
 		}
 		else if (c == '[')
 		{
-			int pop_pms_after = 0;
 			if (TOP_PMS.is_pop_after_use)
 			{
-				pop_pms_after = 1;
 				TOP_PMS.is_pop_after_use = 0;
+			}
+			else
+			{
+				pms_st_duplicate(pms_st);
 			}
 			unsigned int sub_prog_index = prog_table_alloc_prog_index(table);
 			table->array[sub_prog_index] = (prog_t){0};
@@ -449,10 +451,7 @@ int parse_prog(rs_t* src_rs, unsigned int prog_index, prog_table_t* table,
 				/* TODO: Change this ? Maybe ? */
 				src_rs->i++;
 			}
-			if (pop_pms_after)
-			{
-				pms_st_pop(pms_st);
-			}
+			pms_st_pop(pms_st);
 			*prog_alloc_instr(&table->array[prog_index]) = (instr_t){
 				.name = INSTR_PUSH_IMMUINT, .uint64 = sub_prog_index
 			};
@@ -617,66 +616,88 @@ void prog_table_print(const prog_table_t* table)
 }
 
 /* Write the C statements that do what should do the given instruction. */
-void emit_c_instr(gs_t* out_gs, const instr_t* instr)
+void emit_c_instr(gs_t* out_gs, const instr_t* instr, int comments)
 {
 	#define EMIT(...) gs_append_f(out_gs, __VA_ARGS__)
+	#define EMIT_COM(...) \
+		do \
+		{ \
+			if (comments) \
+			{ \
+				EMIT(__VA_ARGS__); \
+			} \
+		} while (0)
+			
 	switch (instr->name)
 	{
 		case INSTR_NOP:
+			EMIT_COM("\t/* nop */\n");
 			EMIT("\t;\n"); 
 		break;
 		case INSTR_LOCAL_HALT:
+			EMIT_COM("\t/* local halt */\n");
 			EMIT("\treturn;\n");
 		break;
 		case INSTR_GLOBAL_HALT:
+			EMIT_COM("\t/* global halt */\n");
 			EMIT("\texit(0);\n");
 		break;
 		case INSTR_PUSH_IMMUINT:
-			EMIT("\ts[i++] = %d;\n", (int)instr->uint64);
+			EMIT_COM("\t/* push %u */\n", (unsigned int)instr->uint64);
+			EMIT("\ts[i++] = %u;\n", (unsigned int)instr->uint64);
 		break;
 		case INSTR_SWAP_ANY:
-			EMIT(
-				"\t{\n"
-				"\t\tuint64_t tmp = s[i-2];\n"
-				"\t\ts[i-2] = s[i-1];\n"
-				"\t\ts[i-1] = tmp;\n"
-				"\t}\n"
-			);
+			EMIT_COM("\t/* swap */\n");
+			EMIT("\t{\n");
+			EMIT("\t\tuint64_t tmp = s[i-2];\n");
+			EMIT("\t\ts[i-2] = s[i-1];\n");
+			EMIT("\t\ts[i-1] = tmp;\n");
+			EMIT("\t}\n");
 		break;
 		case INSTR_DUPLICATE_ANY:
+			EMIT_COM("\t/* duplicate */\n");
 			EMIT("\ts[i] = s[i-1];\n");
 			EMIT("\ti++;\n");
 		break;
 		case INSTR_KILL_ANY:
+			EMIT_COM("\t/* kill */\n");
 			EMIT("\ti--;\n");
 		break;
 		case INSTR_ADD_UINT:
+			EMIT_COM("\t/* add */\n");
 			EMIT("\ts[i-2] = s[i-1] + s[i-2];\n");
 			EMIT("\ti--;\n");
 		break;
 		case INSTR_SUBTRACT_UINT:
+			EMIT_COM("\t/* subtract */\n");
 			EMIT("\ts[i-2] = s[i-1] - s[i-2];\n");
 			EMIT("\ti--;\n");
 		break;
 		case INSTR_MULTIPLY_UINT:
+			EMIT_COM("\t/* multiply */\n");
 			EMIT("\ts[i-2] = s[i-1] * s[i-2];\n");
 			EMIT("\ti--;\n");
 		break;
 		case INSTR_DIVIDE_UINT:
+			EMIT_COM("\t/* divide */\n");
 			EMIT("\ts[i-2] = s[i-1] / s[i-2];\n");
 			EMIT("\ti--;\n");
 		break;
 		case INSTR_MODULUS_UINT:
+			EMIT_COM("\t/* modulus */\n");
 			EMIT("\ts[i-2] = s[i-1] %% s[i-2];\n");
 			EMIT("\ti--;\n");
 		break;
 		case INSTR_PRINT_UINT_AS_CHAR:
+			EMIT_COM("\t/* print character */\n");
 			EMIT("\tprintf(\"%%c\", (unsigned int)s[--i]);\n");
 		break;
 		case INSTR_PRINT_UINT:
+			EMIT_COM("\t/* TODO: remove */\n");
 			EMIT("\tprintf(\"%%u\", (unsigned int)s[--i]);\n");
 		break;
 		case INSTR_PRINT_STACK:
+			EMIT_COM("\t/* TODO: remove */\n");
 			EMIT("\tfor (unsigned int j = 0; j < i-1; j++)\n");
 			EMIT("\t{\n");
 			EMIT("\t\tprintf(\"%%d \", (int)s[j]);\n");
@@ -684,9 +705,11 @@ void emit_c_instr(gs_t* out_gs, const instr_t* instr)
 			EMIT("\tprintf(\"%%d\\n\", (int)s[i-1]);\n");
 		break;
 		case INSTR_EXECUTE_CODEINDEX:
+			EMIT_COM("\t/* execute */\n");
 			EMIT("\tprog_table[s[--i]]();\n");
 		break;
 		case INSTR_IFELSE_CODEINDEX:
+			EMIT_COM("\t/* if else */\n");
 			EMIT("\t{\n");
 			EMIT("\t\tuint64_t condition = s[--i];\n");
 			EMIT("\t\tuint64_t index_if = s[--i];\n");
@@ -695,6 +718,7 @@ void emit_c_instr(gs_t* out_gs, const instr_t* instr)
 			EMIT("\t}\n");
 		break;
 		case INSTR_DOWHILE_CODEINDEX:
+			EMIT_COM("\t/* do while */\n");
 			EMIT("\t{\n");
 			EMIT("\t\tuint64_t index_do = s[--i];\n");
 			EMIT("\t\tdo\n");
@@ -708,20 +732,21 @@ void emit_c_instr(gs_t* out_gs, const instr_t* instr)
 				"\"TODO: Emit the instruction %d\\n\");\n", instr->name);
 		break;
 	}
+	#undef EMIT_COM
 	#undef EMIT
 }
 
 /* Write the C statements that do what should do the given program. */
-void emit_c_prog(gs_t* out_gs, const prog_t* prog)
+void emit_c_prog(gs_t* out_gs, const prog_t* prog, int comments)
 {
 	for (unsigned int i = 0; i < prog->len; i++)
 	{
-		emit_c_instr(out_gs, &prog->array[i]);
+		emit_c_instr(out_gs, &prog->array[i], comments);
 	}
 }
 
 /* Write the complete final ultimate valid C program. */
-void emit_c_all(gs_t* out_gs, const prog_table_t* table)
+void emit_c_all(gs_t* out_gs, const prog_table_t* table, int comments)
 {
 	#define EMIT(...) gs_append_f(out_gs, __VA_ARGS__)
 	EMIT("#include <stdio.h>\n");
@@ -744,7 +769,7 @@ void emit_c_all(gs_t* out_gs, const prog_table_t* table)
 	{
 		EMIT("void code_%u(void)\n", i);
 		EMIT("{\n");
-		emit_c_prog(out_gs, &table->array[i]);
+		emit_c_prog(out_gs, &table->array[i], comments);
 		EMIT("}\n");
 	}
 	EMIT("int main(void)\n");
@@ -894,7 +919,7 @@ int main(int argc, char** argv)
 	gs_t out_gs;
 	gs_init(&out_gs);
 
-	emit_c_all(&out_gs, &table);
+	emit_c_all(&out_gs, &table, g_debug);
 
 	FILE* out_file = fopen(out_file_path, "w");
 	fputs(out_gs.str, out_file);
