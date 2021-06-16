@@ -1,6 +1,16 @@
 
 ## TODO
 
+- Make words for basic instruction
+- Add more basic instructions
+  - Add a dowhile loop
+  - Add a loop that pops n and then pops f and then exec f n times
+  - Add ifelse
+  - Add execute
+  - Add the 5 arithmetic operators
+  - etc.
+- Make it work
+
 - Make a preprocessor that supports
   - Macro definition (with parameters)
   - Macro expansion (with arguments)
@@ -10,9 +20,6 @@
 - Make a mini stdlib to test it
 - Make it work
 
-- Make sure that words like `hello` don't get parsed as `hell` then `o`
-- Make it work
-
 - Add more instructions
   - Add an instruction to push the stack height
   - Add instructions to set/get a value in the stack given its index
@@ -20,29 +27,6 @@
   - Add rotations of the top N values in both directions
     - And why not of the N bottom values too
   - Add many more handful instructions
-
-- Make each instruction having its own C emitting function
-  - Or not, we will see
-- Make it work
-
-- These instruction C emitting functions all take a `modes_t*`
-- The emitting engine updates a `modes_t` according to the passing mode changes
-- The emitting core code is called the *emitting engine* (fancy)
-- And the code handling modes is called the *mode system* (fancyyy)
-- Add the modes `64` and `8`
-- Make it work
-
-- Add ways to manually push and pop `modes_t`
-  - Like blocks that push a copy of the top `modes_t` and pop it at the end
-  - Or directives to manipulate the `modes_t` stack
-- Make it work
-
-- Actually, add more functions to each instruction
-  - The emitting engine should do more passes
-  - The first ones are for listing all the needed features
-  - They call functions on instructions that just say what they will need
-- Add a feature that uses that
-- Make it work
 
 - Make a real readme
 
@@ -65,6 +49,8 @@ made available in a REPL ^^.
 
 Static modes have the syntax `mode,` for referring to the next element, and
 `mode,,` for referring to all the following elements until said otherwise.
+
+Note: maybe not this syntax actually, we will see.
 
 Dynamic modes have.. some syntax, for emitting code that will change the
 variables that describe the dynamic mode involved.
@@ -105,10 +91,6 @@ assemby backend support thing.
 
 Lets keep that for the far future, don't forget what Knuth-sama once said about
 early optimizations.
-
-There are things in the compiler that were optimized (kind-of) and
-that were unoptimized into obviously unefficient code, for reasons.
-And for now I don't care, but one day I will care.
 
 ### Language targets
 

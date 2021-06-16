@@ -143,6 +143,7 @@ if release_build:
 	build_command_args.append("-flto")
 build_command_args.append("-lm")
 build_command = " ".join(build_command_args)
+print_blue(("RELEASE" if release_build else "DEBUG") + " BUILD")
 print_blue(build_command)
 build_exit_status = os.system(build_command)
 

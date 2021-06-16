@@ -8,7 +8,7 @@ Abreviation | Meaning
 `c`         | character
 `cap`       | capacity
 `char`      | character
-`def`       | definition
+`darray`    | dynamic array
 `elem`      | element
 `gs`        | growable string
 `len`       | length
@@ -17,15 +17,8 @@ Abreviation | Meaning
 `init`      | initialize, initialization
 `instr`     | instruction
 `int`       | integer
-`pms`       | parsing mode set
 `prog`      | program
-`res`       | result
-`rs`        | read-only stream
-`sin`       | strings instruction name (1)
-`sinm`      | strings instruction name map (1)
 `src`       | source
 `st`        | stack
 `str`       | string
 `uint`      | unsigned integer
-
-1. A single `sin` is a single mapping of some strings to one instruction name.
