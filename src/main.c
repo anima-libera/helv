@@ -629,7 +629,23 @@ void parse_prog(const char* src, unsigned int* index,
 		else if (c_is_lowercase_letter(c))
 		{
 			#define PARSE_WORD(word_) parse_word_match(src, index, (word_))
-			if (PARSE_WORD("add"))
+			if (PARSE_WORD("nop"))
+			{
+				GENERATE_SIMPLE_INSTR(INSTR_ID_NOP);
+			}
+			else if (PARSE_WORD("kil") || PARSE_WORD("kill"))
+			{
+				GENERATE_SIMPLE_INSTR(INSTR_ID_KILL);
+			}
+			else if (PARSE_WORD("dup") || PARSE_WORD("duplicate"))
+			{
+				GENERATE_SIMPLE_INSTR(INSTR_ID_DUPLICATE);
+			}
+			else if (PARSE_WORD("swp") || PARSE_WORD("swap"))
+			{
+				GENERATE_SIMPLE_INSTR(INSTR_ID_SWAP);
+			}
+			else if (PARSE_WORD("add"))
 			{
 				GENERATE_SIMPLE_INSTR(INSTR_ID_ADD);
 			}
@@ -648,6 +664,30 @@ void parse_prog(const char* src, unsigned int* index,
 			else if (PARSE_WORD("mod") || PARSE_WORD("modulus"))
 			{
 				GENERATE_SIMPLE_INSTR(INSTR_ID_MODULUS);
+			}
+			else if (PARSE_WORD("exe") || PARSE_WORD("execute"))
+			{
+				GENERATE_SIMPLE_INSTR(INSTR_ID_EXECUTE);
+			}
+			else if (PARSE_WORD("ife") || PARSE_WORD("ifelse"))
+			{
+				GENERATE_SIMPLE_INSTR(INSTR_ID_IFELSE);
+			}
+			else if (PARSE_WORD("dwh") || PARSE_WORD("dowhile"))
+			{
+				GENERATE_SIMPLE_INSTR(INSTR_ID_DOWHILE);
+			}
+			else if (PARSE_WORD("rep") || PARSE_WORD("repeat"))
+			{
+				GENERATE_SIMPLE_INSTR(INSTR_ID_REPEAT);
+			}
+			else if (PARSE_WORD("hlt") || PARSE_WORD("halt"))
+			{
+				GENERATE_SIMPLE_INSTR(INSTR_ID_HALT);
+			}
+			else if (PARSE_WORD("pri") || PARSE_WORD("print"))
+			{
+				GENERATE_SIMPLE_INSTR(INSTR_ID_PRINT_CHAR);
 			}
 			else
 			{

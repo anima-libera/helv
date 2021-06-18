@@ -10,7 +10,7 @@ all the files of the repo except `README.md`.
 Helv is inspired by
 [FALSE](http://strlen.com/false-language/) and
 [FORTH](https://www.forth.com/starting-forth/),
-two intresting languages stack-based programming languages.
+two intresting languages to any stack-based programming enthusiast.
 
 ## So it is compiled huh?
 
@@ -76,7 +76,7 @@ for example `0;x` is an infinite loop (that may stack overflow).
 
 I said
 
-> this project is *for fun*
+> this project is only *for fun*
 
 C is more fun than Rust
 

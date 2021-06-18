@@ -15,6 +15,18 @@ contexts:
       push: comment
     - match: '[0-9]+'
       scope: constant.numeric.value.helv
+    - match: '\b(add|sub|subtract|mul|multiply|div|divide|mod|modulus)\b'
+      scope: keyword.operator.arithmetic.helv
+    - match: '\b(exe|execute)\b'
+      scope: keyword.control.helv
+    - match: '\b(ife|ifelse)\b'
+      scope: keyword.control.conditional.if.helv
+    - match: '\b(dwh|dowhile)\b'
+      scope: keyword.control.loop.do-while.helv
+    - match: '\b(rep|repeat)\b'
+      scope: keyword.control.loop.for.helv
+    - match: '\b(hlt|halt)\b'
+      scope: keyword.control.flow.return.helv
     - match: '\['
       scope: punctuation.section.brackets.begin.helv
       push: brackets
@@ -40,6 +52,8 @@ contexts:
   semicolon_word:
     - match: '[0-9]+'
       scope: constant.numeric.value.helv
+    - match: '\+|\-|\*|\/|\%'
+      scope: keyword.operator.arithmetic.helv
     - match: 'x'
       scope: keyword.control.helv
     - match: 'i'
@@ -50,8 +64,6 @@ contexts:
       scope: keyword.control.loop.for.helv
     - match: 'h'
       scope: keyword.control.flow.return.helv
-    - match: '\+|\-|\*|\/|\%'
-      scope: keyword.operator.arithmetic.helv
     - match: '[a-z]'
     - match: '(?![a-z0-9+\-*/%])'
       pop: true

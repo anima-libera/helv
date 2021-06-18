@@ -1,10 +1,6 @@
 
 ## TODO (not in order or anyting)
 
-- Make words for basic instruction
-  - Like `add` for `;+`
-- Make it work
-
 - Make a REPL
 - Make it work
 
