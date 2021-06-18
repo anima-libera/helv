@@ -276,6 +276,7 @@ void execute_prog(const full_prog_t* full_prog, unsigned int prog_index,
 			break;
 			case INSTR_ID_PRINT_CHAR:
 				putchar(st_pop(st));
+				fflush(stdout);
 			break;
 			case INSTR_ID_HALT:
 				return;
@@ -375,7 +376,7 @@ void emit_c_prog(gs_t* gs, const prog_t* prog)
 				 * Make it shorter so that it doesn't hit column 80. */
 			break;
 			case INSTR_ID_PRINT_CHAR:
-				EMIT("\tputchar(st[--i]);\n");
+				EMIT("\tputchar(st[--i]); fflush(stdout);\n");
 			break;
 			case INSTR_ID_HALT:
 				EMIT("\texit(0);\n");
@@ -428,6 +429,11 @@ int c_is_digit(char c)
 	return '0' <= c && c <= '9';
 }
 
+int c_is_lowercase_letter(char c)
+{
+	return 'a' <= c && c <= 'z';
+}
+
 /* Returns the value of the pointed number literal.
  * The given index is updated. */
 unsigned int parse_number_literal(const char* src, unsigned int* index)
@@ -467,7 +473,6 @@ void parse_semicolon_word(const char* src, unsigned int* index,
 			{ \
 				uint8_t* instr = prog_alloc(&PROG, 1); \
 				instr[0] = instr_id_; \
-				(*index)++; \
 			} while (0)
 		char c = src[*index];
 		if (c_is_digit(c))
@@ -481,62 +486,77 @@ void parse_semicolon_word(const char* src, unsigned int* index,
 		else if (c == 'n')
 		{
 			GENERATE_SIMPLE_INSTR(INSTR_ID_NOP);
+			(*index)++;
 		}
 		else if (c == 'k')
 		{
 			GENERATE_SIMPLE_INSTR(INSTR_ID_KILL);
+			(*index)++;
 		}
 		else if (c == 'd')
 		{
 			GENERATE_SIMPLE_INSTR(INSTR_ID_DUPLICATE);
+			(*index)++;
 		}
 		else if (c == 's')
 		{
 			GENERATE_SIMPLE_INSTR(INSTR_ID_SWAP);
+			(*index)++;
 		}
 		else if (c == '+')
 		{
 			GENERATE_SIMPLE_INSTR(INSTR_ID_ADD);
+			(*index)++;
 		}
 		else if (c == '-')
 		{
 			GENERATE_SIMPLE_INSTR(INSTR_ID_SUBTRACT);
+			(*index)++;
 		}
 		else if (c == '*')
 		{
 			GENERATE_SIMPLE_INSTR(INSTR_ID_MULTIPLY);
+			(*index)++;
 		}
 		else if (c == '/')
 		{
 			GENERATE_SIMPLE_INSTR(INSTR_ID_DIVIDE);
+			(*index)++;
 		}
 		else if (c == '%')
 		{
 			GENERATE_SIMPLE_INSTR(INSTR_ID_MODULUS);
+			(*index)++;
 		}
 		else if (c == 'x')
 		{
 			GENERATE_SIMPLE_INSTR(INSTR_ID_EXECUTE);
+			(*index)++;
 		}
 		else if (c == 'i')
 		{
 			GENERATE_SIMPLE_INSTR(INSTR_ID_IFELSE);
+			(*index)++;
 		}
 		else if (c == 'w')
 		{
 			GENERATE_SIMPLE_INSTR(INSTR_ID_DOWHILE);
+			(*index)++;
 		}
 		else if (c == 'r')
 		{
 			GENERATE_SIMPLE_INSTR(INSTR_ID_REPEAT);
+			(*index)++;
 		}
 		else if (c == 'h')
 		{
 			GENERATE_SIMPLE_INSTR(INSTR_ID_HALT);
+			(*index)++;
 		}
 		else if (c == 'p')
 		{
 			GENERATE_SIMPLE_INSTR(INSTR_ID_PRINT_CHAR);
+			(*index)++;
 		}
 		else
 		{
@@ -544,6 +564,35 @@ void parse_semicolon_word(const char* src, unsigned int* index,
 		}
 		#undef GENERATE_SIMPLE_INSTR
 		#undef PROG
+	}
+}
+
+/* Compares the pointed word againts the given word in case of an exact match.
+ * Returns non-zero when it is a match.
+ * The given index is updated when it is a match. */
+int parse_word_match(const char* restrict src, unsigned int* index,
+	const char* restrict word)
+{
+	ASSERT(src != NULL, "The pointer is NULL\n");
+	ASSERT(index != NULL, "The pointer is NULL\n");
+	ASSERT(*index <= strlen(src), "The source index is out of bounds\n");
+	ASSERT(word != NULL, "The pointer is NULL\n");
+	unsigned int i;
+	for (i = 0; word[i] != '\0'; i++)
+	{
+		if (word[i] != src[(*index)+i])
+		{
+			return 0;
+		}
+	}
+	if (!c_is_lowercase_letter(src[(*index)+i]))
+	{
+		*index += i;
+		return 1;
+	}
+	else
+	{
+		return 0;
 	}
 }
 
@@ -562,13 +611,49 @@ void parse_prog(const char* src, unsigned int* index,
 	char c;
 	while ((c = src[*index]) != end_char)
 	{
+		#define PROG full_prog->array[prog_index]
+		#define GENERATE_SIMPLE_INSTR(instr_id_) \
+			do \
+			{ \
+				uint8_t* instr = prog_alloc(&PROG, 1); \
+				instr[0] = instr_id_; \
+			} while (0)
 		if (c_is_digit(c))
 		{
 			unsigned int value = parse_number_literal(src, index);
 			ASSERT(value <= 255, "For now only bytes are supported\n");
-			uint8_t* instr = prog_alloc(&full_prog->array[prog_index], 2);
+			uint8_t* instr = prog_alloc(&PROG, 2);
 			instr[0] = INSTR_ID_PUSH_IMM;
 			instr[1] = value;
+		}
+		else if (c_is_lowercase_letter(c))
+		{
+			#define PARSE_WORD(word_) parse_word_match(src, index, (word_))
+			if (PARSE_WORD("add"))
+			{
+				GENERATE_SIMPLE_INSTR(INSTR_ID_ADD);
+			}
+			else if (PARSE_WORD("sub") || PARSE_WORD("subtract"))
+			{
+				GENERATE_SIMPLE_INSTR(INSTR_ID_SUBTRACT);
+			}
+			else if (PARSE_WORD("mul") || PARSE_WORD("multiply"))
+			{
+				GENERATE_SIMPLE_INSTR(INSTR_ID_MULTIPLY);
+			}
+			else if (PARSE_WORD("div") || PARSE_WORD("divide"))
+			{
+				GENERATE_SIMPLE_INSTR(INSTR_ID_DIVIDE);
+			}
+			else if (PARSE_WORD("mod") || PARSE_WORD("modulus"))
+			{
+				GENERATE_SIMPLE_INSTR(INSTR_ID_MODULUS);
+			}
+			else
+			{
+				ASSERT(0, "TODO: Error to say that a word "
+					"starting by %c (%d) is unexpected\n", c, (int)c);
+			}
 		}
 		else if (c == ';')
 		{
@@ -581,7 +666,7 @@ void parse_prog(const char* src, unsigned int* index,
 			unsigned int sub_prog_index = full_prog_alloc_index(full_prog);
 			parse_prog(src, index, full_prog, sub_prog_index, 0);
 			(*index)++; /* Skip the ']'. */
-			uint8_t* instr = prog_alloc(&full_prog->array[prog_index], 2);
+			uint8_t* instr = prog_alloc(&PROG, 2);
 			instr[0] = INSTR_ID_PUSH_IMM;
 			instr[1] = sub_prog_index;
 		}
@@ -610,6 +695,8 @@ void parse_prog(const char* src, unsigned int* index,
 		{
 			ASSERT(0, "TODO: Error to say %c (%d) is unexpected\n", c, (int)c);
 		}
+		#undef GENERATE_SIMPLE_INSTR
+		#undef PROG
 	}
 }
 

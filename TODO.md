@@ -1,6 +1,10 @@
 
 ## TODO (not in order or anyting)
 
+- Make words for basic instruction
+  - Like `add` for `;+`
+- Make it work
+
 - Make a REPL
 - Make it work
 
@@ -10,15 +14,6 @@
     - `uwu [ awa ;; owo [ [ iwi ] ywy ] h ] [ ;; h h [ ] ]` error
     - No open in already open, `;;[;; ... ;;];;` error
   - Is it ok to `;` in a `;;` zone? Idk..
-- Make it work
-
-- Make words for basic instruction
-- Add more basic instructions
-  - Add a dowhile loop
-  - Add a loop that pops n and then pops f and then exec f n times
-  - Add ifelse
-  - Add the 5 arithmetic operators
-  - etc.
 - Make it work
 
 - Support the `-d` debug command line argument
@@ -41,8 +36,6 @@
     - And why not of the N bottom values too
   - Add many more handful instructions
 
-- Make a real readme
-
 - Add test suite features
 - Make a test suite
 - Make it work
@@ -63,7 +56,7 @@ made available in a REPL ^^.
 Static modes have the syntax `mode,` for referring to the next element, and
 `mode,,` for referring to all the following elements until said otherwise.
 
-Note: maybe not this syntax actually, we will see.
+Note: Maybe not this syntax actually, we will see.
 
 Dynamic modes have.. some syntax, for emitting code that will change the
 variables that describe the dynamic mode involved.

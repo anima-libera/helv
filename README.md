@@ -2,7 +2,7 @@
 # Helv - A stack-based compiled programming language
 
 Note: The project is still in very early alpha 0.0.0 dev developpement,
-for now the best readme might actually be
+for now the best README might actually be
 all the files of the repo except `README.md`.
 
 ## Inspired by
@@ -10,7 +10,7 @@ all the files of the repo except `README.md`.
 Helv is inspired by
 [FALSE](http://strlen.com/false-language/) and
 [FORTH](https://www.forth.com/starting-forth/),
-two intrested languages to anyone intrested in stack-based programming.
+two intresting languages stack-based programming languages.
 
 ## So it is compiled huh?
 
@@ -47,10 +47,11 @@ If you can't stand the absolute lack of features/support/things Helv-related,
 then sure feel free to contribute, I'll be very happy ^^.
 All of you will be *extremely* welcome to even look at this repo haha,
 if ya crazy ya can open issues, throw pull requests, get in touch, etc.
-and I'll be like *omg someone gives a shit*.
-Even if it is all just for pointing out a typo in a comment xd.
+and I'll be overjoyed by the simple fact that someone actually gives a shit.
+Even if it is all just for pointing out a typo in a comment.
 
-Please note that even if this project is *for fun*, I'm serious about it ^^ !
+Please note that even if this project is only *for fun*,
+I'm still serious about it ^^ !
 
 ## The syntax, the specification, the standard
 
@@ -63,6 +64,13 @@ and the pushed number is so that it *refers* to a program,
 the said program is the code in the `[ ]` block.
 When an instruction says it *executes* that number,
 you got it: it executes the program refered by the said number.
+
+The number pushed by a `[ ]` block is
+the number of `[` that are in the source code
+up to (and including) the `[` of the block,
+for example `[][][[][]];x` pushes 1, 2, 4 and 5.
+The number 0 refers to the whole program itself,
+for example `0;x` is an infinite loop (that may stack overflow).
 
 ## Why this not in Rüst?!1
 
