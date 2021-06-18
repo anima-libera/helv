@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <string.h> /* strcmp */
 #include <assert.h> /* static_assert */
 
 /* Elementary macro instruction id, can and should fit in a byte. */
@@ -12,7 +13,17 @@ enum instr_id_t
 	INSTR_ID_NOP = 0,
 	INSTR_ID_PUSH_IMM, /* Immutable byte value follows. */
 	INSTR_ID_KILL,
+	INSTR_ID_DUPLICATE,
+	INSTR_ID_SWAP,
 	INSTR_ID_ADD,
+	INSTR_ID_SUBTRACT,
+	INSTR_ID_MULTIPLY,
+	INSTR_ID_DIVIDE,
+	INSTR_ID_MODULUS,
+	INSTR_ID_EXECUTE,
+	INSTR_ID_IFELSE,
+	INSTR_ID_DOWHILE,
+	INSTR_ID_REPEAT,
 	INSTR_ID_PRINT_CHAR,
 	INSTR_ID_HALT,
 	NUMBER_OF_INSTRUCTION_IDS
@@ -53,43 +64,6 @@ uint8_t* prog_alloc(prog_t* prog, unsigned int len)
 	prog->len += len;
 	DARRAY_RESIZE_IF_NEEDED(prog->len, prog->cap, prog->array, uint8_t);
 	return &prog->array[prog->len - len];
-}
-
-/* Stack of unsigned bytes. */
-struct st_t
-{
-	unsigned int len;
-	unsigned int cap;
-	uint8_t* array;
-};
-typedef struct st_t st_t;
-
-#define ASSERT_CHECK_ST_PTR(st_ptr_) \
-	do \
-	{ \
-		ASSERT(st_ptr_ != NULL, "The pointer is NULL\n"); \
-		ASSERT_CHECK_DARRAY(st_ptr_->len, st_ptr_->cap, st_ptr_->array); \
-	} while (0)
-
-void st_cleanup(st_t* st)
-{
-	ASSERT_CHECK_ST_PTR(st);
-	free(st->array);
-}
-
-void st_push(st_t* st, uint8_t byte)
-{
-	ASSERT_CHECK_ST_PTR(st);
-	st->len++;
-	DARRAY_RESIZE_IF_NEEDED(st->len, st->cap, st->array, uint8_t);
-	st->array[st->len-1] = byte;
-}
-
-uint8_t st_pop(st_t* st)
-{
-	ASSERT_CHECK_ST_PTR(st);
-	ASSERT(st->len >= 1, "The stack is empty, there is nothing to pop\n");
-	return st->array[--st->len];
 }
 
 /* Full Helv program, as opposed to sub progras like those if [ ] blocks. */
@@ -138,10 +112,51 @@ unsigned int full_prog_alloc_index(full_prog_t* full_prog)
 	return full_prog->len-1;
 }
 
-void execute_prog(const prog_t* prog, st_t* st)
+/* Stack of unsigned bytes. */
+struct st_t
 {
-	ASSERT_CHECK_PROG_PTR(prog);
+	unsigned int len;
+	unsigned int cap;
+	uint8_t* array;
+};
+typedef struct st_t st_t;
+
+#define ASSERT_CHECK_ST_PTR(st_ptr_) \
+	do \
+	{ \
+		ASSERT(st_ptr_ != NULL, "The pointer is NULL\n"); \
+		ASSERT_CHECK_DARRAY(st_ptr_->len, st_ptr_->cap, st_ptr_->array); \
+	} while (0)
+
+void st_cleanup(st_t* st)
+{
 	ASSERT_CHECK_ST_PTR(st);
+	free(st->array);
+}
+
+void st_push(st_t* st, uint8_t byte)
+{
+	ASSERT_CHECK_ST_PTR(st);
+	st->len++;
+	DARRAY_RESIZE_IF_NEEDED(st->len, st->cap, st->array, uint8_t);
+	st->array[st->len-1] = byte;
+}
+
+uint8_t st_pop(st_t* st)
+{
+	ASSERT_CHECK_ST_PTR(st);
+	ASSERT(st->len >= 1, "The stack is empty, there is nothing to pop\n");
+	return st->array[--st->len];
+}
+
+void execute_prog(const full_prog_t* full_prog, unsigned int prog_index,
+	st_t* st)
+{
+	ASSERT_CHECK_FULL_PROG_PTR(full_prog);
+	ASSERT_CHECK_ST_PTR(st);
+	ASSERT(prog_index < full_prog->len,
+		"Attempting to execute out of the program table bounds\n");
+	const prog_t* prog = &full_prog->array[prog_index];
 	unsigned int i = 0;
 	while (i < prog->len)
 	{
@@ -159,8 +174,105 @@ void execute_prog(const prog_t* prog, st_t* st)
 			case INSTR_ID_KILL:
 				st_pop(st);
 			break;
+			case INSTR_ID_DUPLICATE:
+				{
+					uint8_t a = st_pop(st);
+					st_push(st, a);
+					st_push(st, a);
+				}
+			break;
+			case INSTR_ID_SWAP:
+				{
+					uint8_t a = st_pop(st);
+					uint8_t b = st_pop(st);
+					st_push(st, a);
+					st_push(st, b);
+				}
+			break;
 			case INSTR_ID_ADD:
 				st_push(st, st_pop(st) + st_pop(st));
+			break;
+			case INSTR_ID_SUBTRACT:
+				{
+					uint8_t a = st_pop(st);
+					uint8_t b = st_pop(st);
+					st_push(st, a - b);
+				}
+			break;
+			case INSTR_ID_MULTIPLY:
+				st_push(st, st_pop(st) * st_pop(st));
+			break;
+			case INSTR_ID_DIVIDE:
+				{
+					uint8_t a = st_pop(st);
+					uint8_t b = st_pop(st);
+					ASSERT(b != 0, "Attempting to devide by zero\n");
+					st_push(st, a / b);
+				}
+			break;
+			case INSTR_ID_MODULUS:
+				{
+					uint8_t a = st_pop(st);
+					uint8_t b = st_pop(st);
+					ASSERT(b != 0,
+						"Attempting to get the reminder "
+						"of a division by zero\n");
+					st_push(st, a % b);
+				}
+			break;
+			case INSTR_ID_EXECUTE:
+				{
+					uint8_t sub_prog_index = st_pop(st);
+					ASSERT(sub_prog_index < full_prog->len,
+						"Attempting to execute "
+						"out of the program table bounds\n");
+					execute_prog(full_prog, sub_prog_index, st);
+				}
+			break;
+			case INSTR_ID_IFELSE:
+				{
+					uint8_t condition = st_pop(st);
+					uint8_t if_prog_index = st_pop(st);
+					uint8_t else_prog_index = st_pop(st);
+					uint8_t chosen_prog_index =
+						condition ? if_prog_index : else_prog_index;
+					ASSERT(chosen_prog_index < full_prog->len,
+						"Attempting to ifelse-execute "
+						"out of the program table bounds\n");
+					execute_prog(full_prog, chosen_prog_index, st);
+				}
+			break;
+			case INSTR_ID_DOWHILE:
+				{
+					uint8_t dowhile_prog_index = st_pop(st);
+					ASSERT(dowhile_prog_index < full_prog->len,
+						"Attempting to dowhile-execute "
+						"out of the program table bounds\n");
+					/* Hope that if one day the program table can be shrinked
+					 * dynamically, then this ASSERT gets moved in the do while
+					 * loop. */
+					do
+					{
+						execute_prog(full_prog, dowhile_prog_index, st);
+					} while (st_pop(st) != 0);
+				}
+			break;
+			case INSTR_ID_REPEAT:
+				{
+					uint8_t how_may_times = st_pop(st);
+					uint8_t repeat_prog_index = st_pop(st);
+					ASSERT(how_may_times > 0 &&
+						repeat_prog_index < full_prog->len,
+						"Attempting to repeat-execute "
+						"out of the program table bounds\n");
+					/* Hope that if one day the program table can be shrinked
+					 * dynamically, then this ASSERT gets moved in the for
+					 * loop. */
+					for (unsigned int j = 0; j < how_may_times; j++)
+					{
+						execute_prog(full_prog, repeat_prog_index, st);
+					}
+				}
 			break;
 			case INSTR_ID_PRINT_CHAR:
 				putchar(st_pop(st));
@@ -178,7 +290,7 @@ void execute_full_prog(const full_prog_t* full_prog, st_t* st)
 	ASSERT_CHECK_ST_PTR(st);
 	ASSERT(full_prog->len >= 1,
 		"The full program does not contain even one program\n");
-	execute_prog(&full_prog->array[0], st);
+	execute_prog(full_prog, 0, st);
 }
 
 /* Appends C code to the given growable string,
@@ -205,8 +317,62 @@ void emit_c_prog(gs_t* gs, const prog_t* prog)
 			case INSTR_ID_KILL:
 				EMIT("\ti--;\n");
 			break;
+			case INSTR_ID_DUPLICATE:
+				EMIT("\tst[i] = st[i-1]; i++;\n");
+			break;
+			case INSTR_ID_SWAP:
+				EMIT(
+					"\t{"
+						"uint8_t x = st[i-1]; "
+						"st[i-1] = st[i-2]; "
+						"st[i-2] = x;"
+					"}\n");
+			break;
 			case INSTR_ID_ADD:
-				EMIT("\tst[i-2] += st[i-1]; i--;\n");
+				EMIT("\tst[i-2] = st[i-1] + st[i-2]; i--;\n");
+			break;
+			case INSTR_ID_SUBTRACT:
+				EMIT("\tst[i-2] = st[i-1] - st[i-2]; i--;\n");
+			break;
+			case INSTR_ID_MULTIPLY:
+				EMIT("\tst[i-2] = st[i-1] * st[i-2]; i--;\n");
+			break;
+			case INSTR_ID_DIVIDE:
+				EMIT("\tst[i-2] = st[i-1] / st[i-2]; i--;\n");
+			break;
+			case INSTR_ID_MODULUS:
+				EMIT("\tst[i-2] = st[i-1] %% st[i-2]; i--;\n");
+			break;
+			case INSTR_ID_EXECUTE:
+				EMIT("\tprog_table[st[--i]]();\n");
+			break;
+			case INSTR_ID_IFELSE:
+				EMIT(
+					"\tprog_table["
+						"st[--i] ? "
+						"(i--, st[i--]) : (i--, st[--i])" /* Oh my~ */
+					"]();\n");
+			break;
+			case INSTR_ID_DOWHILE:
+				EMIT(
+					"\t{"
+						"uint8_t f = st[--i]; "
+						"do {"
+							"prog_table[f]();"
+						"} while (st[--i]);"
+					"}\n");
+			break;
+			case INSTR_ID_REPEAT:
+				EMIT(
+					"\t{"
+						"uint8_t n = st[--i]; "
+						"uint8_t f = st[--i]; "
+						"for (unsigned int j = 0; j < n; j++) {"
+							"prog_table[f]();"
+						"}"
+					"}\n");
+				/* TODO:
+				 * Make it shorter so that it doesn't hit column 80. */
 			break;
 			case INSTR_ID_PRINT_CHAR:
 				EMIT("\tputchar(st[--i]);\n");
@@ -226,7 +392,8 @@ void emit_c_full_prog(gs_t* gs, const full_prog_t* full_prog)
 	ASSERT(full_prog->len >= 1,
 		"The full program does not contain even one program\n");
 	#define EMIT(...) gs_append_f(gs, __VA_ARGS__)
-	EMIT(""
+	EMIT(
+		"#include <stdlib.h>\n"
 		"#include <stdio.h>\n"
 		"#include <stdint.h>\n"
 		"uint8_t st[99999];\n"
@@ -243,12 +410,12 @@ void emit_c_full_prog(gs_t* gs, const full_prog_t* full_prog)
 	EMIT("};\n");
 	for (unsigned int i = 0; i < full_prog->len; i++)
 	{
-		EMIT("int prog_%u(void)\n", i);
+		EMIT("void prog_%u(void)\n", i);
 		EMIT("{\n");
 		emit_c_prog(gs, &full_prog->array[i]);
 		EMIT("}\n");
 	}
-	EMIT(""
+	EMIT(
 		"int main(void)\n"
 		"{\n"
 		"\tprog_table[0]();\n"
@@ -261,6 +428,8 @@ int c_is_digit(char c)
 	return '0' <= c && c <= '9';
 }
 
+/* Returns the value of the pointed number literal.
+ * The given index is updated. */
 unsigned int parse_number_literal(const char* src, unsigned int* index)
 {
 	ASSERT(src != NULL, "The pointer is NULL\n");
@@ -292,52 +461,93 @@ void parse_semicolon_word(const char* src, unsigned int* index,
 		"The program index is out of bounds\n");
 	while (1)
 	{
+		#define PROG full_prog->array[prog_index]
+		#define GENERATE_SIMPLE_INSTR(instr_id_) \
+			do \
+			{ \
+				uint8_t* instr = prog_alloc(&PROG, 1); \
+				instr[0] = instr_id_; \
+				(*index)++; \
+			} while (0)
 		char c = src[*index];
 		if (c_is_digit(c))
 		{
 			unsigned int value = parse_number_literal(src, index);
 			ASSERT(value <= 255, "For now only bytes are supported\n");
-			uint8_t* instr = prog_alloc(&full_prog->array[prog_index], 2);
+			uint8_t* instr = prog_alloc(&PROG, 2);
 			instr[0] = INSTR_ID_PUSH_IMM;
 			instr[1] = value;
 		}
 		else if (c == 'n')
 		{
-			uint8_t* instr = prog_alloc(&full_prog->array[prog_index], 1);
-			instr[0] = INSTR_ID_NOP;
-			(*index)++;
+			GENERATE_SIMPLE_INSTR(INSTR_ID_NOP);
 		}
 		else if (c == 'k')
 		{
-			uint8_t* instr = prog_alloc(&full_prog->array[prog_index], 1);
-			instr[0] = INSTR_ID_KILL;
-			(*index)++;
+			GENERATE_SIMPLE_INSTR(INSTR_ID_KILL);
+		}
+		else if (c == 'd')
+		{
+			GENERATE_SIMPLE_INSTR(INSTR_ID_DUPLICATE);
+		}
+		else if (c == 's')
+		{
+			GENERATE_SIMPLE_INSTR(INSTR_ID_SWAP);
 		}
 		else if (c == '+')
 		{
-			uint8_t* instr = prog_alloc(&full_prog->array[prog_index], 1);
-			instr[0] = INSTR_ID_ADD;
-			(*index)++;
+			GENERATE_SIMPLE_INSTR(INSTR_ID_ADD);
+		}
+		else if (c == '-')
+		{
+			GENERATE_SIMPLE_INSTR(INSTR_ID_SUBTRACT);
+		}
+		else if (c == '*')
+		{
+			GENERATE_SIMPLE_INSTR(INSTR_ID_MULTIPLY);
+		}
+		else if (c == '/')
+		{
+			GENERATE_SIMPLE_INSTR(INSTR_ID_DIVIDE);
+		}
+		else if (c == '%')
+		{
+			GENERATE_SIMPLE_INSTR(INSTR_ID_MODULUS);
+		}
+		else if (c == 'x')
+		{
+			GENERATE_SIMPLE_INSTR(INSTR_ID_EXECUTE);
+		}
+		else if (c == 'i')
+		{
+			GENERATE_SIMPLE_INSTR(INSTR_ID_IFELSE);
+		}
+		else if (c == 'w')
+		{
+			GENERATE_SIMPLE_INSTR(INSTR_ID_DOWHILE);
+		}
+		else if (c == 'r')
+		{
+			GENERATE_SIMPLE_INSTR(INSTR_ID_REPEAT);
 		}
 		else if (c == 'h')
 		{
-			uint8_t* instr = prog_alloc(&full_prog->array[prog_index], 1);
-			instr[0] = INSTR_ID_HALT;
-			(*index)++;
+			GENERATE_SIMPLE_INSTR(INSTR_ID_HALT);
 		}
 		else if (c == 'p')
 		{
-			uint8_t* instr = prog_alloc(&full_prog->array[prog_index], 1);
-			instr[0] = INSTR_ID_PRINT_CHAR;
-			(*index)++;
+			GENERATE_SIMPLE_INSTR(INSTR_ID_PRINT_CHAR);
 		}
 		else
 		{
 			break;
 		}
+		#undef GENERATE_SIMPLE_INSTR
+		#undef PROG
 	}
 }
 
+/* Parse a program, being a full file or a [ ] block content. */
 void parse_prog(const char* src, unsigned int* index,
 	full_prog_t* full_prog, unsigned int prog_index,
 	int end_is_eof)
@@ -379,6 +589,23 @@ void parse_prog(const char* src, unsigned int* index,
 		{
 			(*index)++;
 		}
+		else if (c == '#')
+		{
+			(*index)++;
+			while (src[*index] != '#' && src[*index] != '\0')
+			{
+				(*index)++;
+			}
+			if (src[*index] == '\0')
+			{
+				fprintf(stderr, "Syntax warning: Non-closed comment\n");
+				/* TODO: Setup a real logging system thing */
+			}
+			else
+			{
+				(*index)++;
+			}
+		}
 		else
 		{
 			ASSERT(0, "TODO: Error to say %c (%d) is unexpected\n", c, (int)c);
@@ -395,25 +622,188 @@ void parse_full_prog(const char* src, full_prog_t* full_prog)
 	parse_prog(src, &index, full_prog, prog_index, 1);
 }
 
-int main(void)
+int main(int argc, const char** argv)
 {
+	const char* src = NULL;
+	const char* dst = NULL;
+	int src_is_allocated = 0;
+	int help = 0;
+	int version = 0;
+	int execute = 0;
+
+	for (unsigned int i = 1; i < (unsigned int)argc; i++)
+	{
+		if (argv[i][0] == '-')
+		{
+			#define IS(s1_, s2_) (strcmp((s1_), (s2_)) == 0)
+			if (IS(argv[i], "-h") || IS(argv[i], "--help"))
+			{
+				help = 1;
+			}
+			else if (IS(argv[i], "-v") || IS(argv[i], "--version"))
+			{
+				version = 1;
+			}
+			else if (IS(argv[i], "-e") || IS(argv[i], "--execute"))
+			{
+				execute = 1;
+			}
+			else if (IS(argv[i], "-c") || IS(argv[i], "--code"))
+			{
+				if (i == (unsigned int)argc-1)
+				{
+					fprintf(stderr, "Command line argument error: "
+						"The code option requiers a following argument\n");
+				}
+				else if (src != NULL)
+				{
+					fprintf(stderr, "Command line argument error: "
+						"The code option cannot sets the source code "
+						"as it is already given by previous arguments\n");
+					i++;
+				}
+				else
+				{
+					src = argv[++i];
+				}
+			}
+			else if (IS(argv[i], "-o") || IS(argv[i], "--out"))
+			{
+				if (i == (unsigned int)argc-1)
+				{
+					fprintf(stderr, "Command line argument error: "
+						"The out option requiers a following argument\n");
+				}
+				else if (dst != NULL)
+				{
+					fprintf(stderr, "Command line argument error: "
+						"The out option cannot sets the destination file "
+						"as it is already given by previous arguments\n");
+					i++;
+				}
+				else
+				{
+					dst = argv[++i];
+				}
+			}
+			else
+			{
+				fprintf(stderr, "Command line argument error: "
+					"Unknown option %s\n", argv[i]);
+			}
+			#undef IS
+		}
+		else /* Source code file name */
+		{
+			if (src != NULL)
+			{
+				fprintf(stderr, "Command line argument error: "
+					"The file \"%s\" cannot be the source code "
+					"as it is already given by previous arguments\n",
+					argv[i]);
+			}
+			else
+			{
+				src = read_file(argv[i]);
+				src_is_allocated = 1;
+			}
+		}
+	}
+
+	#ifdef DEBUG
+		#define YN(condition_) ((condition_) ? "yes" : "no")
+		printf("Debug build command line arguments:\n"
+			"  Source code provided: %s\n"
+			"  Compile or execute: %s\n"
+			"  Destination file name: %s\n"
+			"  Version wanted: %s\n"
+			"  Help wanted: %s\n",
+			YN(src != NULL),
+			execute ? "execute" : "compile",
+			dst != NULL ? dst : "*none*",
+			YN(version),
+			YN(help));
+		#undef YN
+		if (version || help || src != NULL)
+		{
+			printf("\n");
+		}
+	#endif
+
+	#define VERSION_MAJOR 0
+	#define VERSION_MINOR 0
+	#define VERSION_PATCH 0
+	#define VERSION_NAME "dev"
+
+	if (version)
+	{
+		printf("Helv reference implementation, "
+			"version %d.%d.%d %s, %s build\n",
+			VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH, VERSION_NAME,
+			#ifdef DEBUG
+				"debug"
+			#else
+				"release"
+			#endif
+		);
+		printf("See https://github.com/anima-libera/helv\n");
+	}
+
+	if (help)
+	{
+		if (version)
+		{
+			printf("\n");
+		}
+		printf(
+			"Usage:\n"
+			"  %s [options] file\n"
+			"Options:\n"
+			"  -c --code     Sets the program source to the next argument\n"
+			"  -e --execute  Executes the program instead of compiling it\n"
+			"  -h --help     Displays this help message\n"
+			"  -o --out      Sets the output file name to the next argument\n"
+			"  -v --version  Displays the implementation version\n",
+			argc == 0 ? "helv" : argv[0]);
+	}
+
+	if (src == NULL)
+	{
+		return 0;
+	}
+
 	full_prog_t full_prog = {0};
+	parse_full_prog(src, &full_prog);
+	if (src_is_allocated)
+	{
+		free((char*)src);
+	}
 
-	parse_full_prog("  10 96[;h];+p \t\n  ;ph", &full_prog);
-
-	gs_t gs;
-	gs_init(&gs);
-
-	emit_c_full_prog(&gs, &full_prog);
-
-	st_t st = {0};
-	execute_full_prog(&full_prog, &st);
-	st_cleanup(&st);
+	if (execute)
+	{
+		st_t st = {0};
+		execute_full_prog(&full_prog, &st);
+		st_cleanup(&st);
+	}
+	else
+	{
+		gs_t gs;
+		gs_init(&gs);
+		emit_c_full_prog(&gs, &full_prog);
+		if (dst != NULL)
+		{
+			FILE* dst_file = fopen(dst, "w");
+			fputs(gs.str, dst_file);
+			fclose(dst_file);
+		}
+		else
+		{
+			fputs(gs.str, stdout);
+		}
+		gs_cleanup(&gs);
+	}
 
 	full_prog_cleanup(&full_prog);
-
-	fputs(gs.str, stdout);
-	gs_cleanup(&gs);
 
 	return 0;
 }

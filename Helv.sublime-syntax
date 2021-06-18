@@ -10,6 +10,9 @@ version: 2
 contexts:
 
   main:
+    - match: '#'
+      scope: punctuation.definition.comment.begin.helv
+      push: comment
     - match: '[0-9]+'
       scope: constant.numeric.value.helv
     - match: '\['
@@ -21,6 +24,12 @@ contexts:
       scope: keyword.declaration.function.helv
       push: semicolon_word
 
+  comment:
+    - meta_scope: comment.block.helv
+    - match: '#'
+      scope: punctuation.definition.comment.end.helv
+      pop: true
+
   brackets:
     - meta_scope: meta.brackets.helv
     - match: '\]'
@@ -31,6 +40,14 @@ contexts:
   semicolon_word:
     - match: '[0-9]+'
       scope: constant.numeric.value.helv
+    - match: 'x'
+      scope: keyword.control.helv
+    - match: 'i'
+      scope: keyword.control.conditional.if.helv
+    - match: 'w'
+      scope: keyword.control.loop.do-while.helv
+    - match: 'r'
+      scope: keyword.control.loop.for.helv
     - match: 'h'
       scope: keyword.control.flow.return.helv
     - match: '\+|\-|\*|\/|\%'

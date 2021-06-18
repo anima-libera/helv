@@ -25,7 +25,9 @@
 	 * assertions are optimized out or not.
 	 * After the condition, printf-like arguments are requiered.
 	 * It is ok for assertions to be expensive, as long as they may catch a bug
-	 * early, and they are debug-build-only anyway. */
+	 * early, they are debug-build-only anyway.
+	 * It is ok for assertions to be redundant, let's abuse assertions,
+	 * lets gooo, C memory safe language confirmed! */
 	#define ASSERT(condition_, ...) \
 		do \
 		{ \
@@ -77,5 +79,8 @@ unsigned int umax(unsigned int a, unsigned int b);
 		ASSERT(cap_ != 0 || ptr_ == NULL, \
 			"The capacity is 0 but the pointer is non-null\n"); \
 	} while (0)
+
+/* Returns an allocated buffer containing the file's content. */
+char* read_file(const char* file_path);
 
 #endif /* HELV_UTILS_HEADER */

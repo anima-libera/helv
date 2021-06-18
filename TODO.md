@@ -1,15 +1,28 @@
 
-## TODO
+## TODO (not in order or anyting)
+
+- Make a REPL
+- Make it work
+
+- Make it so that `;;` opens and close the short mode
+  - It must error if it is not closed on the same block level thing
+    - `uwu [ awa ;; owo [ [ iwi ] ywy ] h ;; h h [ ] ]` ok
+    - `uwu [ awa ;; owo [ [ iwi ] ywy ] h ] [ ;; h h [ ] ]` error
+    - No open in already open, `;;[;; ... ;;];;` error
+  - Is it ok to `;` in a `;;` zone? Idk..
+- Make it work
 
 - Make words for basic instruction
 - Add more basic instructions
   - Add a dowhile loop
   - Add a loop that pops n and then pops f and then exec f n times
   - Add ifelse
-  - Add execute
   - Add the 5 arithmetic operators
   - etc.
 - Make it work
+
+- Support the `-d` debug command line argument
+- Maybe like a verbose mode?
 
 - Make a preprocessor that supports
   - Macro definition (with parameters)
