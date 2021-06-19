@@ -1,20 +1,6 @@
 
 ## TODO (not in order or anyting)
 
-- Make a REPL
-- Make it work
-
-- Make it so that `;;` opens and close the short mode
-  - It must error if it is not closed on the same block level thing
-    - `uwu [ awa ;; owo [ [ iwi ] ywy ] h ;; h h [ ] ]` ok
-    - `uwu [ awa ;; owo [ [ iwi ] ywy ] h ] [ ;; h h [ ] ]` error
-    - No open in already open, `;;[;; ... ;;];;` error
-  - Is it ok to `;` in a `;;` zone? Idk..
-- Make it work
-
-- Support the `-d` debug command line argument
-- Maybe like a verbose mode?
-
 - Make a preprocessor that supports
   - Macro definition (with parameters)
   - Macro expansion (with arguments)
@@ -24,13 +10,17 @@
 - Make a mini stdlib to test it
 - Make it work
 
+- Make a REPL
+- Make it work
+
+- Support the `-d` debug command line argument
+- Maybe like a verbose mode?
+
+- Add serious debugging features
+- Make it work
+
 - Add more instructions
-  - Add an instruction to push the stack height
-  - Add instructions to set/get a value in the stack given its index
-    - From top or bottom
-  - Add rotations of the top N values in both directions
-    - And why not of the N bottom values too
-  - Add many more handful instructions
+- Make it work
 
 - Add test suite features
 - Make a test suite

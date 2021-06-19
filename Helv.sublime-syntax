@@ -26,6 +26,9 @@ contexts:
     - include: semicolon_compatible_main
     - match: '[0-9]+'
       scope: constant.numeric.value.helv
+    - match: \'
+      scope: punctuation.definition.string.begin.helv
+      push: single_quoted_string
     - match: '\b(add|sub|subtract|mul|multiply|div|divide|mod|modulus)\b'
       scope: keyword.operator.arithmetic.helv
     - match: '\b(exe|execute)\b'
@@ -38,6 +41,10 @@ contexts:
       scope: keyword.control.loop.for.helv
     - match: '\b(hlt|halt)\b'
       scope: keyword.control.flow.return.helv
+    - match: '\b(hei|height)\b'
+      scope: support.constant.helv
+    - match: '\b(pri|print)\b'
+      scope: support.function.helv
     - match: ';;'
       scope: punctuation.section.block.begin.helv keyword.declaration.function.helv
       push: semicolon_mode
@@ -83,6 +90,8 @@ contexts:
       scope: keyword.control.loop.for.helv
     - match: 'h'
       scope: keyword.control.flow.return.helv
+    - match: 'p'
+      scope: support.function.helv
     - match: '[a-z]'
 
   semicolon_word:
@@ -98,3 +107,9 @@ contexts:
       pop: true
     - match: ';' # may be removed ?
       scope: keyword.declaration.function.helv
+
+  single_quoted_string:
+    - meta_scope: string.quoted.single.helv
+    - match: \'
+      scope: punctuation.definition.string.end.helv
+      pop: true

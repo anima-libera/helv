@@ -1,13 +1,54 @@
 
-10 96[;h];+p ;p # a #
-[10 100 100 100 ;pppp] ;k2x # ddd #
+# Some early dev tests #
+
+10 96[;h];+p ;p                         # a #
+[10 100 100 100 ;pppp] ;k2x             # ddd #
 17 9 ;s- 2 ;s/ 3 ;* 9 ;s% 48 ;+ ;p ;10p # 3 #
-;17n9s-2s/3*9s%48+p10p # also 3 but shorter #
+;17n9s-2s/3*9s%48+p10p                  # 3 #
+[;99p];4r ;10p                          # cccc #
+4 [;99p ;1s-d];wk ;10p                  # cccc #
+4 [;d2s%[99];s[97];sip ;1s-d];wk ;10p   # caca #
+[][][][] ;sksk- 97 add pri ;10p         # d #
+;; 97 26 + 1s- [+++++ h[]]k p 10 p ;;   # z #
+'abc' ;ppp 10 print                     # cba #
+
+
+# Print stack height (below 10) #
+
+[0] 5 rep
+height '0' add print 10 print # 5 #
+[kil] 5 rep
+
+
+# Print string backwards #
+
+0 10 'long srting uwu'
+[dup [0]swp [pri 1]swp ife] dwh kil # uwu gnitrs gnol #
+
+
+# Print string normally #
+
+'long string owo' 10
+	0 [dup get pri 1 add dup hei sub 2 swp sub] dwh kil # long string owo #
+[[0] [kil 1] 3 hei sub ife] dwh # empty the stack #
+
+
+# Print number #
+
+189                                   # number to be printed #
+2 hei sub                             # index of the number (stays on top) #
+0 swp                                 # null-terminator for the digits #
 [
-	[;99p];4r ;10p # cccc #
-	4 [;99p ;1s-d];w ;10p # cccc #
-	4 [;d2s%[99];s[97];sip ;1s-d];w ;10p # caca #
-];x
-[][][][] ;sksk- 97 add pri ;10p # d #
-;; 97 26 + 1s- [+++++ h[]]k p 10 p ;; # z #
-halt
+	dup get 10 swp mod '0' add swp    # push last digit #
+	dup dup get 10 swp div swp set    # divide the number by 10 #
+	dup get
+] dwh
+kil                                   # kill the index #
+[dup [kil 0] swp [pri 1] swp ife] dwh # reverse print until null-terminator #
+kil                                   # kill the consumed number #
+10 pri
+
+
+# Print ASCII 33-127 #
+
+'!'[;dp1+d'~';s-];w10p
