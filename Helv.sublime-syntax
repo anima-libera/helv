@@ -9,10 +9,21 @@ version: 2
 
 contexts:
 
-  main:
+  semicolon_compatible_main:
     - match: '#'
       scope: punctuation.definition.comment.begin.helv
       push: comment
+    - match: '\['
+      scope: punctuation.section.block.begin.helv punctuation.section.brackets.begin.helv
+      push: semicolon_brackets
+    - match: '\]'
+      scope: invalid.illegal.helv
+
+  main:
+    - match: '\['
+      scope: punctuation.section.block.begin.helv punctuation.section.brackets.begin.helv
+      push: brackets
+    - include: semicolon_compatible_main
     - match: '[0-9]+'
       scope: constant.numeric.value.helv
     - match: '\b(add|sub|subtract|mul|multiply|div|divide|mod|modulus)\b'
@@ -27,11 +38,9 @@ contexts:
       scope: keyword.control.loop.for.helv
     - match: '\b(hlt|halt)\b'
       scope: keyword.control.flow.return.helv
-    - match: '\['
-      scope: punctuation.section.brackets.begin.helv
-      push: brackets
-    - match: '\]'
-      scope: invalid.illegal.helv
+    - match: ';;'
+      scope: punctuation.section.block.begin.helv keyword.declaration.function.helv
+      push: semicolon_mode
     - match: ';'
       scope: keyword.declaration.function.helv
       push: semicolon_word
@@ -43,13 +52,23 @@ contexts:
       pop: true
 
   brackets:
-    - meta_scope: meta.brackets.helv
+    - meta_scope: meta.block.helv meta.brackets.helv
     - match: '\]'
-      scope: punctuation.section.brackets.end.helv
+      scope: punctuation.section.block.end.helv punctuation.section.brackets.end.helv
       pop: true
     - include: main
 
-  semicolon_word:
+  semicolon_brackets:
+    - meta_scope: meta.block.helv meta.brackets.helv
+    - match: '\]'
+      scope: punctuation.section.block.end.helv punctuation.section.brackets.end.helv
+      pop: true
+    - match: ';;'
+      scope: invalid.illegal.helv
+    - include: semicolon_compatible_main
+    - include: semicolon_chars
+
+  semicolon_chars:
     - match: '[0-9]+'
       scope: constant.numeric.value.helv
     - match: '\+|\-|\*|\/|\%'
@@ -65,5 +84,17 @@ contexts:
     - match: 'h'
       scope: keyword.control.flow.return.helv
     - match: '[a-z]'
+
+  semicolon_word:
+    - include: semicolon_chars
     - match: '(?![a-z0-9+\-*/%])'
       pop: true
+
+  semicolon_mode:
+    - include: semicolon_compatible_main
+    - include: semicolon_chars
+    - match: ';;'
+      scope: punctuation.section.block.end.helv keyword.declaration.function.helv
+      pop: true
+    - match: ';' # may be removed ?
+      scope: keyword.declaration.function.helv

@@ -1,0 +1,13 @@
+
+10 96[;h];+p ;p # a #
+[10 100 100 100 ;pppp] ;k2x # ddd #
+17 9 ;s- 2 ;s/ 3 ;* 9 ;s% 48 ;+ ;p ;10p # 3 #
+;17n9s-2s/3*9s%48+p10p # also 3 but shorter #
+[
+	[;99p];4r ;10p # cccc #
+	4 [;99p ;1s-d];w ;10p # cccc #
+	4 [;d2s%[99];s[97];sip ;1s-d];w ;10p # caca #
+];x
+[][][][] ;sksk- 97 add pri ;10p # d #
+;; 97 26 + 1s- [+++++ h[]]k p 10 p ;; # z #
+halt

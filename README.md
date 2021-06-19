@@ -91,3 +91,23 @@ Programming can be a way to craft software, or it can be a way to have fun
 Sorry ><'
 
 Please refer to the *Wanna contribute?* section of this README.
+
+## Testing
+
+### Interpreter
+
+```sh
+python3 _comp.py -d -l ../examples/test.hv -e
+```
+
+### "Compiler"
+
+```sh
+python3 _comp.py -d -l ../examples/test.hv
+```
+
+### Anything else
+
+```sh
+python3 _comp.py -d -l --help
+```
