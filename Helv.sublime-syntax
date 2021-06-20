@@ -44,7 +44,9 @@ contexts:
     - match: '\b(hei|height)\b'
       scope: support.constant.helv
     - match: '\b(pri|print)\b'
-      scope: support.function.helv
+      #scope: support.function.helv
+    - match: '\b(cur|current|pre|previous|nex|next)\b'
+      scope: support.constant.helv
     - match: ';;'
       scope: punctuation.section.block.begin.helv keyword.declaration.function.helv
       push: semicolon_mode
@@ -91,7 +93,7 @@ contexts:
     - match: 'h'
       scope: keyword.control.flow.return.helv
     - match: 'p'
-      scope: support.function.helv
+      #scope: support.function.helv
     - match: '[a-z]'
 
   semicolon_word:

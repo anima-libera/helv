@@ -1,4 +1,11 @@
 
+# Here are some helv programs written to test the compiler.
+| Some are more readable than others (can't really say 'idiomatic' because
+| by the time of writing there are no idioms yet).
+| It is so much more nice-looking with syntax highlighting (provided by
+| Sublime Text if the Helv.sublime-syntax file is dropped in the User folder
+| for Sublime Text user configs and stuff). #
+
 # Some early dev tests #
 
 10 96[;h];+p ;p                         # a #
@@ -12,26 +19,22 @@
 ;; 97 26 + 1s- [+++++ h[]]k p 10 p ;;   # z #
 'abc' ;ppp 10 print                     # cba #
 
-
 # Print stack height (below 10) #
 
 [0] 5 rep
 height '0' add print 10 print # 5 #
 [kil] 5 rep
 
-
 # Print string backwards #
 
 0 10 'long srting uwu'
 [dup [0]swp [pri 1]swp ife] dwh kil # uwu gnitrs gnol #
-
 
 # Print string normally #
 
 'long string owo' 10
 	0 [dup get pri 1 add dup hei sub 2 swp sub] dwh kil # long string owo #
 [[0] [kil 1] 3 hei sub ife] dwh # empty the stack #
-
 
 # Print number #
 
@@ -48,7 +51,11 @@ kil                                   # kill the index #
 kil                                   # kill the consumed number #
 10 pri
 
-
 # Print ASCII 33-127 #
 
 '!'[;dp1+d'~';s-];w10p
+
+# Tests #
+
+['a';p] kil pre exe nex exe ['z';p] kil ;10p # az #
+'a' [dup pri ;1+ dup [;10p] swp cur swp 'z';1+ sub ife] exe # a-z #

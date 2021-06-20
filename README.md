@@ -58,6 +58,8 @@ I'm still serious about it ^^ !
 This part of the README will be added when
 the syntax will be likely to be stable.
 
+The `examples/test.hv` file can provide an overview of the language state.
+
 One thing to know is what a `[ ]` block actually do.
 It is an instruction that pushes a number on the stack,
 and the pushed number is so that it *refers* to a program,

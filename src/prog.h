@@ -41,7 +41,7 @@ struct prog_t
 	unsigned int len;
 	unsigned int cap;
 	uint8_t* array; /* Bytecode. */
-	int is_finished; /* Is this program fully parsed? */
+	int is_finished; /* Is this program fully parsed yet? */
 };
 typedef struct prog_t prog_t;
 

@@ -148,6 +148,7 @@ void parse_full_prog(const char* src, full_prog_t* full_prog)
 	int short_mode_level = -1;
 	unsigned int index = 0;
 	unsigned int prog_index = full_prog_alloc_index(full_prog);
+	unsigned int previous = prog_index;
 	char c;
 	while ((c = src[index]) != '\0')
 	{
@@ -226,6 +227,24 @@ void parse_full_prog(const char* src, full_prog_t* full_prog)
 			else if (PWGSI(PWM2("rep", "repeat"),    INSTR_ID_REPEAT));
 			else if (PWGSI(PWM2("hlt", "halt"),      INSTR_ID_HALT));
 			else if (PWGSI(PWM2("pri", "print"),     INSTR_ID_PRINT_CHAR));
+			else if (PWM2("cur", "current"))
+			{
+				uint8_t* instr = prog_alloc(&PROG, 2);
+				instr[0] = INSTR_ID_PUSH_IMM;
+				instr[1] = prog_index;
+			}
+			else if (PWM2("pre", "previous"))
+			{
+				uint8_t* instr = prog_alloc(&PROG, 2);
+				instr[0] = INSTR_ID_PUSH_IMM;
+				instr[1] = previous;
+			}
+			else if (PWM2("nex", "next"))
+			{
+				uint8_t* instr = prog_alloc(&PROG, 2);
+				instr[0] = INSTR_ID_PUSH_IMM;
+				instr[1] = full_prog->len;
+			}
 			else
 			{
 				ASSERT(0, "TODO: Error to say that a word "
@@ -272,6 +291,7 @@ void parse_full_prog(const char* src, full_prog_t* full_prog)
 		else if (c == ']')
 		{
 			PROG.is_finished = 1;
+			previous = prog_index;
 			while (PROG.is_finished)
 			{
 				prog_index--;

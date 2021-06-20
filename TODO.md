@@ -29,6 +29,10 @@
 - Make a test suite
 - Make it work
 
+- Make the compiler itself generate the `.sublime-syntax` file
+  - So that some scope choices are customizable
+- Make it work
+
 ## Ideas
 
 ### Interpreter, compile time execution and REPL
@@ -81,6 +85,12 @@ Examples of wanted optimisations:
 
 Also, handle register allocation, it will allow serious optimisations for any
 assemby backend support thing.
+
+Also for assembly targets, support tail call optimisation!
+Like `[cur exe]exe` should infinite loop but it eventually stack overflow, 
+with tail call optimisation
+(any `exe`-like instruction at the end of a `[ ]` block)
+it would just infinite loop.
 
 ### Optimizations of the compiler
 
