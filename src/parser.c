@@ -141,21 +141,15 @@ static int parse_word_match(const char* restrict src, unsigned int* index,
 	}
 }
 
-/* Parse a program, being a full file or a [ ] block content. */
-static void parse_prog(const char* src, unsigned int* index,
-	full_prog_t* full_prog, unsigned int prog_index,
-	int end_is_eof, int short_mode)
+void parse_full_prog(const char* src, full_prog_t* full_prog)
 {
 	ASSERT(src != NULL, "The pointer is NULL\n");
-	ASSERT(index != NULL, "The pointer is NULL\n");
-	ASSERT(*index <= strlen(src), "The source index is out of bounds\n");
 	ASSERT_CHECK_FULL_PROG_PTR(full_prog);
-	ASSERT(prog_index < full_prog->len,
-		"The program index is out of bounds\n");
-	char end_char = end_is_eof ? '\0' : ']';
-	int local_short_mode = 0;
+	int short_mode_level = -1;
+	unsigned int index = 0;
+	unsigned int prog_index = full_prog_alloc_index(full_prog);
 	char c;
-	while ((c = src[*index]) != end_char)
+	while ((c = src[index]) != '\0')
 	{
 		#define PROG full_prog->array[prog_index]
 		uint8_t* gsi_instr;
@@ -165,34 +159,38 @@ static void parse_prog(const char* src, unsigned int* index,
 				gsi_instr[0] = instr_id_, \
 				(void)0 \
 			)
-		if ((short_mode || local_short_mode) && c_is_semicolon_instr(c))
+		if (short_mode_level >= 0 && c_is_semicolon_instr(c))
 		{
-			parse_semicolon_word(src, index, full_prog, prog_index);
+			parse_semicolon_word(src, &index, full_prog, prog_index);
 		}
 		else if (c == ';')
 		{
-			(*index)++;
-			if (src[*index] == ';')
+			index++;
+			if (src[index] == ';')
 			{
-				if (short_mode)
+				index++;
+				if (short_mode_level >= 1)
 				{
 					ASSERT(0, "TODO: Error to say that "
 						";; can't be used in a [ ] block already in ;;\n");
 				}
+				else if (short_mode_level == 0)
+				{
+					short_mode_level = -1;
+				}
 				else
 				{
-					local_short_mode = !local_short_mode;
-					(*index)++;
+					short_mode_level = 0;
 				}
 			}
 			else
 			{
-				parse_semicolon_word(src, index, full_prog, prog_index);
+				parse_semicolon_word(src, &index, full_prog, prog_index);
 			}
 		}
 		else if (c_is_digit(c))
 		{
-			unsigned int value = parse_number_literal(src, index);
+			unsigned int value = parse_number_literal(src, &index);
 			ASSERT(value <= 255, "For now only bytes are supported\n");
 			uint8_t* instr = prog_alloc(&PROG, 2);
 			instr[0] = INSTR_ID_PUSH_IMM;
@@ -200,7 +198,7 @@ static void parse_prog(const char* src, unsigned int* index,
 		}
 		else if (c_is_lowercase_letter(c))
 		{
-			#define PWM1(word_) parse_word_match(src, index, (word_))
+			#define PWM1(word_) parse_word_match(src, &index, (word_))
 			#define PWM2(word_1_, word_2_) (PWM1(word_1_) || PWM1(word_2_))
 			int x;
 			#define PWGSI(pw_code_, instr_id_) \
@@ -239,15 +237,15 @@ static void parse_prog(const char* src, unsigned int* index,
 		}
 		else if (c == '\'')
 		{
-			(*index)++;
-			while (src[*index] != '\'' && src[*index] != '\0')
+			index++;
+			while (src[index] != '\'' && src[index] != '\0')
 			{
 				uint8_t* instr = prog_alloc(&PROG, 2);
 				instr[0] = INSTR_ID_PUSH_IMM;
-				instr[1] = src[*index];
-				(*index)++;
+				instr[1] = src[index];
+				index++;
 			}
-			if (src[*index] == '\0')
+			if (src[index] == '\0')
 			{
 				fprintf(stderr, "Syntax warning: "
 					"Non-closed single-quoted string\n");
@@ -255,39 +253,59 @@ static void parse_prog(const char* src, unsigned int* index,
 			}
 			else
 			{
-				(*index)++;
+				index++;
 			}
 		}
 		else if (c == '[')
 		{
-			(*index)++;
+			index++;
 			unsigned int sub_prog_index = full_prog_alloc_index(full_prog);
-			parse_prog(src, index, full_prog, sub_prog_index,
-				0, short_mode || local_short_mode);
-			(*index)++; /* Skip the ']'. */
 			uint8_t* instr = prog_alloc(&PROG, 2);
 			instr[0] = INSTR_ID_PUSH_IMM;
 			instr[1] = sub_prog_index;
+			prog_index = sub_prog_index;
+			if (short_mode_level >= 0)
+			{
+				short_mode_level++;
+			}
+		}
+		else if (c == ']')
+		{
+			PROG.is_finished = 1;
+			while (PROG.is_finished)
+			{
+				prog_index--;
+			}
+			index++;
+			if (short_mode_level >= 1)
+			{
+				short_mode_level--;
+			}
+			else if (short_mode_level == 0)
+			{
+				ASSERT(0, "TODO: Error to say that "
+					";; must be closed before the [ ] block it is in\n");
+			}
 		}
 		else if (c == '\t' || c == ' ' || c == '\n')
 		{
-			(*index)++;
+			index++;
 		}
 		else if (c == '#')
 		{
-			(*index)++;
-			while (src[*index] != '#' && src[*index] != '\0')
+			index++;
+			while (src[index] != '#' && src[index] != '\0')
 			{
-				(*index)++;
+				index++;
 			}
-			if (src[*index] == '\0')
+			if (src[index] == '\0')
 			{
 				fprintf(stderr, "Syntax warning: Non-closed comment\n");
 				/* TODO: Setup a real logging system thing */
 			}
 			else
 			{
-				(*index)++;
+				index++;
 			}
 		}
 		else
@@ -297,13 +315,4 @@ static void parse_prog(const char* src, unsigned int* index,
 		#undef GENERATE_SIMPLE_INSTR
 		#undef PROG
 	}
-}
-
-void parse_full_prog(const char* src, full_prog_t* full_prog)
-{
-	ASSERT(src != NULL, "The pointer is NULL\n");
-	ASSERT_CHECK_FULL_PROG_PTR(full_prog);
-	unsigned int index = 0;
-	unsigned int prog_index = full_prog_alloc_index(full_prog);
-	parse_prog(src, &index, full_prog, prog_index, 1, 0);
 }

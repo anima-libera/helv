@@ -18,6 +18,7 @@ Abreviation | Meaning
 `instr`     | instruction
 `int`       | integer
 `prog`      | program
+`ps`        | parsing state
 `src`       | source
 `st`        | stack
 `str`       | string

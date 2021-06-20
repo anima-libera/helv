@@ -13,6 +13,9 @@
 - Make a REPL
 - Make it work
 
+- Add a C emitting option to `#define` all the instructions
+- Make it work
+
 - Support the `-d` debug command line argument
 - Maybe like a verbose mode?
 

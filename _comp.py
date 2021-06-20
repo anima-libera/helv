@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-""" Compiles the maaee source code.
+""" Compiles the Helv source code.
 
 Usage:
   {this_script} [options]
