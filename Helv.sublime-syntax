@@ -45,7 +45,7 @@ contexts:
       scope: support.constant.helv
     - match: '\b(pri|print)\b'
       #scope: support.function.helv
-    - match: '\b(cur|current|pre|previous|nex|next)\b'
+    - match: '\b(cur|current|prv|previous|nex|next)\b'
       scope: support.constant.helv
     - match: ';;'
       scope: punctuation.section.block.begin.helv keyword.declaration.function.helv

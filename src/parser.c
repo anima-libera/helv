@@ -233,7 +233,7 @@ void parse_full_prog(const char* src, full_prog_t* full_prog)
 				instr[0] = INSTR_ID_PUSH_IMM;
 				instr[1] = prog_index;
 			}
-			else if (PWM2("pre", "previous"))
+			else if (PWM2("prv", "previous"))
 			{
 				uint8_t* instr = prog_alloc(&PROG, 2);
 				instr[0] = INSTR_ID_PUSH_IMM;

@@ -57,5 +57,5 @@ kil                                   # kill the consumed number #
 
 # Tests #
 
-['a';p] kil pre exe nex exe ['z';p] kil ;10p # az #
+['a';p] kil prv exe nex exe ['z';p] kil ;10p # az #
 'a' [dup pri ;1+ dup [;10p] swp cur swp 'z';1+ sub ife] exe # a-z #
