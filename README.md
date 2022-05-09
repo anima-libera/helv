@@ -1,4 +1,6 @@
 
+Note: This project is so abandoned that I forgot its existence.. Don't expect this to go anywhere, especially don't pay attention to what the rest of this README claims.
+
 # Helv - A stack-based compiled programming language
 
 Note: The project is still in very early alpha 0.0.0 dev developpement,
